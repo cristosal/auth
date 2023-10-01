@@ -8,11 +8,11 @@ import (
 	"github.com/go-redis/redis/v7"
 )
 
-var url = "localhost:6379"
+var redisAddr = "localhost:6379"
 
 func getLimiter() Limiter {
 	rds := redis.NewClient(&redis.Options{
-		Addr:       url,
+		Addr:       redisAddr,
 		MaxRetries: 3,
 	})
 
@@ -23,7 +23,7 @@ func getLimiter() Limiter {
 func TestLimitExpires(t *testing.T) {
 	l := getLimiter()
 	k := "test-limit-expires"
-	// max of 2 request means 2 requests are allowed within the window
+	// max of 2 means 2 hits are allowed within the window
 	if err := l.Limit(k, 2, time.Second); err != nil {
 		t.Fatal(err)
 	}
