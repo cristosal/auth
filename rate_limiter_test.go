@@ -20,6 +20,30 @@ func getLimiter() Limiter {
 	return limiter
 }
 
+func TestLimitExpires(t *testing.T) {
+	l := getLimiter()
+	k := "test-limit-expires"
+	// max of 2 request means 2 requests are allowed within the window
+	if err := l.Limit(k, 2, time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := l.Limit(k, 2, time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	// we expect an error here
+	if err := l.Limit(k, 2, time.Second); err == nil {
+		t.Fatal("expected error got nil")
+	}
+
+	time.Sleep(time.Second)
+
+	if err := l.Limit(k, 2, time.Second); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestLimit1Passes(t *testing.T) {
 	l := getLimiter()
 
