@@ -35,9 +35,10 @@ func (*GroupPermission) TableName() string {
 	return "group_permissions"
 }
 
-// JoinGroup adds a user to a group
+// JoinGroup adds a user to a group.
+// No error will occur if a user is already part of the group
 func (s *Service) JoinGroup(uid pgxx.ID, gid pgxx.ID) error {
-	return pgxx.Exec(s.db, "insert into group_users (user_id, group_id) values ($1, $2)", uid, gid)
+	return pgxx.Exec(s.db, "insert into group_users (user_id, group_id) values ($1, $2) on conflict do nothing", uid, gid)
 }
 
 // LeaveGroup removes a user from a group
