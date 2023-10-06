@@ -22,6 +22,8 @@ type (
 		FindSession(id string) (*Session, error)
 		CreateSession(sess *Session) error
 		SaveSession(sess *Session) error
+		UserSessions(uid pgxx.ID) ([]Session, error)
+		DeleteUserSessions(uid pgxx.ID) error
 		RemoveSession(id string) error
 	}
 
