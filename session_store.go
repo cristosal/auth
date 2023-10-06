@@ -67,7 +67,7 @@ func (s sessionStore) FindSession(id string) (*Session, error) {
 }
 
 func (s sessionStore) UserSessions(uid pgxx.ID) ([]Session, error) {
-	rows, err := s.Query(ctx, "select id from sessions where user_id = $1", uid)
+	rows, err := s.Query(ctx, "select session_id from sessions where user_id = $1", uid)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (s sessionStore) UserSessions(uid pgxx.ID) ([]Session, error) {
 }
 
 func (s sessionStore) DeleteUserSessions(uid pgxx.ID) error {
-	rows, err := s.Query(ctx, "select id from sessions where user_id = $1", uid)
+	rows, err := s.Query(ctx, "select session_id from sessions where user_id = $1", uid)
 	if err != nil {
 		return err
 	}
