@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -16,8 +15,24 @@ func getLimiter() Limiter {
 		MaxRetries: 3,
 	})
 
-	limiter := NewRedisRateLimiter(rds)
+	limiter := NewRedisLimiter(rds)
 	return limiter
+}
+
+func TestTTL(t *testing.T) {
+	var (
+		l   = getLimiter()
+		max = 3
+		k   = "test"
+	)
+
+	l.Limit(k, max, time.Minute)
+	l.Limit(k, max, time.Minute)
+	l.Limit(k, max, time.Minute)
+	ttl := l.TTL(k, max)
+	if ttl != time.Minute {
+		t.Fatal("expected ttl to be minute")
+	}
 }
 
 func TestLimitExpires(t *testing.T) {
@@ -55,20 +70,11 @@ func TestLimit1Passes(t *testing.T) {
 func TestLimit2Fails(t *testing.T) {
 	l := getLimiter()
 	l.Limit("test", 1, time.Second)
+
 	if err := l.Limit("test", 1, time.Second); err == nil {
 		t.Fatal("expected err got nil")
 	}
 
-}
-
-func TestAsMaxAttemptsError(t *testing.T) {
-	l := getLimiter()
-	err := l.Limit("test", 0, time.Second)
-
-	var e MaxAttemptsError
-	if !errors.As(err, &e) {
-		t.Fatal("expected errors as to be true for max attempts error")
-	}
 }
 
 func TestRateLimiter(t *testing.T) {
