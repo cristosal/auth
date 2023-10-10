@@ -29,14 +29,14 @@ type Limiter interface {
 // RedisLimiter is the implementation for Limiter using redis as cache
 type RedisLimiter struct{ cl *redis.Client }
 
-// NewRedisLimiter returns a Limiter implementation using redis as cache store
+// NewRedisLimiter returns a Limiter implementation using redis as the underlying cache store
 func NewRedisLimiter(cl *redis.Client) *RedisLimiter {
 	return &RedisLimiter{cl}
 }
 
 // Limit is the implementation of Limiter interface.
-// It returns ErrLimitReached attempts have been exceeded.
-func (l RedisLimiter) Limit(key string, max int, window time.Duration) error {
+// It returns ErrLimitReached when attempts have been exceeded.
+func (l *RedisLimiter) Limit(key string, max int, window time.Duration) error {
 	if l.limitReached(key, max) {
 		return ErrLimitReached
 	}
@@ -55,7 +55,7 @@ func (l RedisLimiter) Limit(key string, max int, window time.Duration) error {
 	return nil
 }
 
-func (l RedisLimiter) TTL(key string, max int) (ttl time.Duration) {
+func (l *RedisLimiter) TTL(key string, max int) (ttl time.Duration) {
 	if !l.limitReached(key, max) {
 		return 0
 	}
@@ -68,12 +68,12 @@ func (l RedisLimiter) TTL(key string, max int) (ttl time.Duration) {
 	return ttl
 }
 
-func (l RedisLimiter) Reset(key string) error {
+func (l *RedisLimiter) Reset(key string) error {
 	cmd := l.cl.Del(key)
 	return cmd.Err()
 }
 
-func (l RedisLimiter) limitReached(key string, max int) bool {
+func (l *RedisLimiter) limitReached(key string, max int) bool {
 	h, err := l.get(key)
 	if err != nil {
 		return false
@@ -82,7 +82,7 @@ func (l RedisLimiter) limitReached(key string, max int) bool {
 	return h >= max
 }
 
-func (l RedisLimiter) get(key string) (hits int, err error) {
+func (l *RedisLimiter) get(key string) (hits int, err error) {
 	cmd := l.cl.Get(key)
 	err = cmd.Err()
 
@@ -97,18 +97,18 @@ func (l RedisLimiter) get(key string) (hits int, err error) {
 	return strconv.Atoi(cmd.Val())
 }
 
-func (l RedisLimiter) hit(key string) (hits int, err error) {
+func (l *RedisLimiter) hit(key string) (hits int, err error) {
 	cmd := l.cl.Incr(key)
 	err = cmd.Err()
 	hits = int(cmd.Val())
 	return
 }
 
-func (l RedisLimiter) expire(key string, duration time.Duration) error {
+func (l *RedisLimiter) expire(key string, duration time.Duration) error {
 	cmd := l.cl.Expire(key, duration)
 	return cmd.Err()
 }
 
-func (l RedisLimiter) ttl(key string) (time.Duration, error) {
+func (l *RedisLimiter) ttl(key string) (time.Duration, error) {
 	return l.cl.TTL(key).Result()
 }
