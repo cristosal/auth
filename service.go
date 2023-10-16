@@ -53,20 +53,20 @@ func (s *Service) Init() error {
 
 		create table if not exists groups (
 			id serial primary key,
-			priority int not null default 1,
-			name varchar(255) not null unique
+			name varchar(255) not null unique,
+			description text not null,
+			priority int not null default 1
 		);
 
 		create table if not exists permissions (
 			id serial primary key,
-			key varchar(255) not null unique,
-			value int not null default 0
+			name varchar(255) not null unique
 		);
 
 		create table if not exists group_permissions (
 			group_id int not null, 
 			permission_id int not null,
-			value int not null,
+			value int not null default 0,
 			primary key (group_id, permission_id),
 			foreign key (group_id) references groups (id) on delete cascade,
 			foreign key (permission_id) references permissions (id) on delete cascade
@@ -79,51 +79,5 @@ func (s *Service) Init() error {
 			foreign key (user_id) references users (id) on delete cascade,
 			foreign key (group_id) references groups (id) on delete cascade
 		);
-
-		create or replace function get_group_permissions(int)
-		returns setof permissions
-		as $$
-		begin
-			return query
-			select p.id, p.key, coalesce(gp.value, p.value)  as value
-			from 
-				permissions p
-			left join 
-				group_permissions gp on p.id = gp.permission_id and gp.group_id = $1
-			order by p.key asc;
-		end;
-		$$ language plpgsql;
-
-		create or replace function get_user_permissions(int) 
-		returns setof permissions
-		as $$
-		declare
-			v_group groups;
-		begin
-			select g.* 
-			into v_group 
-			from 
-				groups g
-			inner join
-				group_users gu on gu.group_id = g.id and gu.user_id = $1
-			order by 
-				g.priority desc
-			limit 1;
-
-			if not found then
-				return query select * from permissions order by key asc;
-			end if;
-
-			return query
-			select p.id, p.key, coalesce(gp.value, p.value)  as value
-			from 
-				group_permissions gp
-			left join 
-				permissions p on p.id = gp.permission_id
-			where 
-				gp.group_id = v_group.id
-			order by p.key asc;
-		end;
-		$$ language plpgsql;
 	`)
 }
