@@ -19,17 +19,17 @@ type (
 	key string
 
 	Session struct {
-		ID          string         `json:"id"`
-		Counter     int            `json:"counter"`
-		User        *User          `json:"user,omitempty"`
-		Permissions Permissions    `json:"permissions,omitempty"`
-		Groups      Groups         `json:"groups,omitempty"`
-		UserAgent   string         `json:"user_agent"`
-		ExpiresAt   time.Time      `json:"expires_at"`
-		Message     string         `json:"message"`
-		MessageType string         `json:"message_type"`
-		IP          string         `json:"ip"`
-		Meta        map[string]any `json:"meta"`
+		ID          string           `json:"id"`
+		Counter     int              `json:"counter"`
+		User        *User            `json:"user,omitempty"`
+		Permissions GroupPermissions `json:"permissions,omitempty"`
+		Groups      Groups           `json:"groups,omitempty"`
+		UserAgent   string           `json:"user_agent"`
+		ExpiresAt   time.Time        `json:"expires_at"`
+		Message     string           `json:"message"`
+		MessageType string           `json:"message_type"`
+		IP          string           `json:"ip"`
+		Meta        map[string]any   `json:"meta"`
 		dirty       bool
 	}
 )
