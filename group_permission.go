@@ -46,7 +46,7 @@ func (gps GroupPermissions) Has(name string) bool {
 	return false
 }
 
-func (s *Service) UserGroupPermissions(uid pgxx.ID) (GroupPermissions, error) {
+func (r *GroupPgxRepo) UserPermissions(uid pgxx.ID) (GroupPermissions, error) {
 	sql := `select 
 		gp.group_id, 
 		gp.permission_id, 
@@ -70,7 +70,7 @@ func (s *Service) UserGroupPermissions(uid pgxx.ID) (GroupPermissions, error) {
 	where 
 		gu.user_id = $1`
 
-	rows, err := s.db.Query(ctx, sql, uid)
+	rows, err := r.db.Query(ctx, sql, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -98,8 +98,8 @@ func (s *Service) UserGroupPermissions(uid pgxx.ID) (GroupPermissions, error) {
 	return groupPermissions, nil
 }
 
-// GroupPermissions returns group permissions for a group by group id
-func (s *Service) GroupPermissions(gid pgxx.ID) (GroupPermissions, error) {
+// Permissions returns group permissions for a group by group id
+func (r *GroupPgxRepo) Permissions(gid pgxx.ID) (GroupPermissions, error) {
 	sql := `select 
 		gp.group_id, 
 		gp.permission_id, 
@@ -119,7 +119,7 @@ func (s *Service) GroupPermissions(gid pgxx.ID) (GroupPermissions, error) {
 	where 
 		gp.group_id = $1`
 
-	rows, err := s.db.Query(ctx, sql, gid)
+	rows, err := r.db.Query(ctx, sql, gid)
 	if err != nil {
 		return nil, err
 	}
@@ -147,10 +147,10 @@ func (s *Service) GroupPermissions(gid pgxx.ID) (GroupPermissions, error) {
 	return groupPermissions, nil
 }
 
-func (s *Service) AddGroupPermission(gid, pid pgxx.ID, v int) error {
-	return pgxx.Exec(s.db, "insert into group_permissions (group_id, permission_id, value) values ($1, $2, $3)", gid, pid, v)
+func (r *GroupPgxRepo) AddPermission(gid, pid pgxx.ID, value int) error {
+	return pgxx.Exec(r.db, "insert into group_permissions (group_id, permission_id, value) values ($1, $2, $3)", gid, pid, value)
 }
 
-func (s *Service) RemoveGroupPermission(gid, pid pgxx.ID) error {
-	return pgxx.Exec(s.db, "delete from group_permissions where group_id = $1 and permission_id = $2", gid, pid)
+func (r *GroupPgxRepo) RemovePermission(gid, pid pgxx.ID) error {
+	return pgxx.Exec(r.db, "delete from group_permissions where group_id = $1 and permission_id = $2", gid, pid)
 }
