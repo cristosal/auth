@@ -6,15 +6,37 @@ import (
 	"github.com/cristosal/pgxx"
 )
 
-type Service struct{ db pgxx.DB }
+type PgxService struct {
+	db         pgxx.DB
+	permission *PermissionPgxRepo
+	user       *UserPgxService
+	group      *GroupPgxRepo
+}
 
 var ctx = context.Background()
 
-func New(db pgxx.DB) *Service {
-	return &Service{db: db}
+func NewPgxService(db pgxx.DB) *PgxService {
+	return &PgxService{
+		db:         db,
+		permission: NewPermissionPgxRepo(db),
+		group:      NewGroupPgxRepo(db),
+		user:       NewUserPgxService(db),
+	}
 }
 
-func (s *Service) Init() error {
+func (s *PgxService) Users() *UserPgxService {
+	return s.user
+}
+
+func (s *PgxService) Permissions() *PermissionPgxRepo {
+	return s.permission
+}
+
+func (s *PgxService) Groups() *GroupPgxRepo {
+	return s.group
+}
+
+func (s *PgxService) Init() error {
 	return pgxx.Exec(s.db, `
 		create table if not exists users (
 			id serial primary key,
