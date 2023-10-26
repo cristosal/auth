@@ -60,7 +60,9 @@ func (s *Service) Init() error {
 
 		create table if not exists permissions (
 			id serial primary key,
-			name varchar(255) not null unique
+			name varchar(255) not null unique,
+			description text not null,
+			type varchar(32) not null default 'access'
 		);
 
 		create table if not exists group_permissions (
