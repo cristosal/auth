@@ -31,6 +31,38 @@ func (g *Group) NewPermission(p *Permission, v int) *GroupPermission {
 	}
 }
 
+func (s *Service) SeedGroups(groups []Group) error {
+	var (
+		i     = 1
+		parts []string
+		args  []any
+	)
+
+	for _, v := range groups {
+		parts = append(parts, fmt.Sprintf("($%d, $%d, $%d)", i, i+1, i+2))
+		args = append(args, v.Name, v.Description, v.Priority)
+		i += 3
+	}
+
+	sql := fmt.Sprintf("insert into groups (name, description, priority) values %s on conflict (name) do nothing returning id", strings.Join(parts, ", "))
+	rows, err := s.db.Query(ctx, sql, args...)
+	if err != nil {
+		return err
+	}
+
+	defer rows.Close()
+
+	i = 0
+	for rows.Next() {
+		if err := rows.Scan(&groups[i].ID); err != nil {
+			return err
+		}
+		i++
+	}
+
+	return rows.Err()
+}
+
 // JoinGroup adds a user to a group.
 // No error will occur if a user is already part of the group
 func (s *Service) JoinGroup(uid pgxx.ID, gid pgxx.ID) error {
