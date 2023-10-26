@@ -39,7 +39,27 @@ func (u *User) VerifyPassword(pass string) bool {
 	return err == nil
 }
 
-func (r *Service) PaginateUsers(page int, q string) (*pgxx.PaginationResults[User], error) {
+type UserPgxService struct{ db pgxx.DB }
+
+func NewUserPgxService(db pgxx.DB) *UserPgxService {
+	return &UserPgxService{db}
+}
+
+type UserService interface {
+	UserRepo
+	Authenticator
+	PasswordReseter
+}
+
+type UserRepo interface {
+	Paginate(page int, q string) (*pgxx.PaginationResults[User], error)
+	ByID(pgxx.ID) (*User, error)
+	ByEmail(string) (*User, error)
+	UpdateInfo(*User) error
+}
+
+// Paginate paginates through users returning the most recent ones first
+func (r *UserPgxService) Paginate(page int, q string) (*pgxx.PaginationResults[User], error) {
 	return pgxx.Paginate[User](r.db, &pgxx.PaginationOptions{
 		Record:        &User{},
 		Query:         q,
@@ -51,7 +71,8 @@ func (r *Service) PaginateUsers(page int, q string) (*pgxx.PaginationResults[Use
 	})
 }
 
-func (r *Service) UserByID(id pgxx.ID) (*User, error) {
+// ByID returns a user by id field
+func (r *UserPgxService) ByID(id pgxx.ID) (*User, error) {
 	var u User
 	if err := pgxx.One(r.db, &u, "where id = $1", id); err != nil {
 		return nil, err
@@ -60,7 +81,8 @@ func (r *Service) UserByID(id pgxx.ID) (*User, error) {
 	return &u, nil
 }
 
-func (r *Service) UserByEmail(email string) (*User, error) {
+// ByEmail returns a user by email
+func (r *UserPgxService) ByEmail(email string) (*User, error) {
 	var u User
 	if err := pgxx.One(r.db, &u, "where email = $1", email); err != nil {
 		return nil, err
@@ -69,6 +91,7 @@ func (r *Service) UserByEmail(email string) (*User, error) {
 	return &u, nil
 }
 
-func (r *Service) UpdateUser(u *User) error {
+// UpdateInfo updates the users info, excluding the password
+func (r *UserPgxService) UpdateInfo(u *User) error {
 	return pgxx.Exec(r.db, "update users set name = $1, email = $2, phone = $3 where id = $4", u.Name, u.Email, u.Phone, u.ID)
 }

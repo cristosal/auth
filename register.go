@@ -38,7 +38,7 @@ type (
 	}
 )
 
-func (s *Service) Register(name, email, pass, phone string) (*Registration, error) {
+func (r *UserPgxService) Register(name, email, pass, phone string) (*Registration, error) {
 	ctx := context.Background()
 
 	// sanitize values
@@ -46,7 +46,7 @@ func (s *Service) Register(name, email, pass, phone string) (*Registration, erro
 	email = strings.ToLower(strings.Trim(email, " "))
 	phone = strings.Trim(phone, " ")
 
-	row := s.db.QueryRow(ctx, "select email from users where email = $1", email)
+	row := r.db.QueryRow(ctx, "select email from users where email = $1", email)
 
 	var found string
 
@@ -66,7 +66,7 @@ func (s *Service) Register(name, email, pass, phone string) (*Registration, erro
 		return nil, err
 	}
 
-	tx, err := s.db.Begin(ctx)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -100,9 +100,9 @@ func (s *Service) Register(name, email, pass, phone string) (*Registration, erro
 	return &res, nil
 }
 
-func (s *Service) ConfirmRegistration(tok string) (*User, error) {
+func (r *UserPgxService) ConfirmRegistration(tok string) (*User, error) {
 	ctx := context.Background()
-	tx, err := s.db.Begin(ctx)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -148,8 +148,8 @@ func (s *Service) ConfirmRegistration(tok string) (*User, error) {
 	return &u, nil
 }
 
-func (s *Service) RenewRegistration(uid pgxx.ID) (tok string, err error) {
-	if err = pgxx.Exec(s.db, "select 1 from users where id = $1", uid); err != nil {
+func (r *UserPgxService) RenewRegistration(uid pgxx.ID) (tok string, err error) {
+	if err = pgxx.Exec(r.db, "select 1 from users where id = $1", uid); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			err = ErrUserNotFound
 		}
@@ -157,7 +157,7 @@ func (s *Service) RenewRegistration(uid pgxx.ID) (tok string, err error) {
 	}
 
 	ctx := context.Background()
-	tx, err := s.db.Begin(ctx)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return
 	}

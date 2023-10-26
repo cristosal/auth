@@ -18,7 +18,7 @@ type PasswordReseter interface {
 	ConfirmPasswordReset(token, pass string) error
 }
 
-func (s *Service) RequestPasswordReset(email string) (tok string, err error) {
+func (r *UserPgxService) RequestPasswordReset(email string) (tok string, err error) {
 	var (
 		id   int64
 		name string
@@ -26,7 +26,7 @@ func (s *Service) RequestPasswordReset(email string) (tok string, err error) {
 	)
 
 	// check if user exists.
-	row := s.db.QueryRow(ctx, "select id, name from users where email = $1", email)
+	row := r.db.QueryRow(ctx, "select id, name from users where email = $1", email)
 	if err = row.Scan(&id, &name); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", ErrUserNotFound
@@ -35,7 +35,7 @@ func (s *Service) RequestPasswordReset(email string) (tok string, err error) {
 		return "", err
 	}
 
-	tx, err := s.db.Begin(ctx)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return
 	}
@@ -63,10 +63,10 @@ func (s *Service) RequestPasswordReset(email string) (tok string, err error) {
 	return
 }
 
-func (s *Service) ConfirmPasswordReset(token, pass string) error {
+func (r *UserPgxService) ConfirmPasswordReset(token, pass string) error {
 	ctx := context.Background()
 
-	tx, err := s.db.Begin(ctx)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (s *Service) ConfirmPasswordReset(token, pass string) error {
 	return tx.Commit(ctx)
 }
 
-func (s *Service) ResetPassword(uid pgxx.ID, pass string) error {
+func (r *UserPgxService) ResetPassword(uid pgxx.ID, pass string) error {
 	ctx := context.Background()
 
 	hashed, err := PasswordHash(pass)
@@ -114,7 +114,7 @@ func (s *Service) ResetPassword(uid pgxx.ID, pass string) error {
 		return err
 	}
 
-	_, err = s.db.Exec(ctx, "update users set password = $1 where id = $2", hashed, uid)
+	_, err = r.db.Exec(ctx, "update users set password = $1 where id = $2", hashed, uid)
 	return err
 }
 

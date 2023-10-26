@@ -23,15 +23,15 @@ func TestRegister(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := auth.New(conn)
+	s := auth.NewPgxService(conn)
 
 	// test sanitizes value
-	reg, err := s.Register("pepe   ", " pepito@gmail.com  ", "hello world", "123")
+	reg, err := s.Users().Register("pepe   ", " pepito@gmail.com  ", "hello world", "123")
 	if err != nil {
 		t.Fatalf("unable to register %v", err)
 	}
 
-	_, err = s.Register("pepe   ", "    pepito@gmail.com  ", "hello world", "123")
+	_, err = s.Users().Register("pepe   ", "    pepito@gmail.com  ", "hello world", "123")
 	if !errors.Is(err, auth.ErrUserExists) {
 		t.Fatalf("expected user exists got %v", err)
 	}
@@ -48,12 +48,12 @@ func TestRegister(t *testing.T) {
 		t.Fatal("expected token to be present")
 	}
 
-	_, err = s.ConfirmRegistration("fail")
+	_, err = s.Users().ConfirmRegistration("fail")
 	if !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("expected invalid token got %v", err)
 	}
 
-	_, err = s.ConfirmRegistration(reg.Token)
+	_, err = s.Users().ConfirmRegistration(reg.Token)
 	if err != nil {
 		t.Fatal("expected confirmation of token to not return anything")
 	}
