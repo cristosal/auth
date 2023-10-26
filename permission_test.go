@@ -9,20 +9,22 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func NewTestService(t *testing.T) *auth.Service {
+func NewTestService(t *testing.T) *auth.PgxService {
 	conn, err := pgx.Connect(context.Background(), os.Getenv("CONNECTION_STRING"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return auth.New(conn)
+	return auth.NewPgxService(conn)
 }
 
 func TestPermission(t *testing.T) {
 	svc := NewTestService(t)
 	t.Cleanup(func() {
-		svc.ClearPermissions()
+		svc.Permissions().Clear()
 	})
+
+	svc.Users()
 
 	perms := []auth.Permission{
 		{Name: "test"},
@@ -30,7 +32,7 @@ func TestPermission(t *testing.T) {
 		{Name: "test2"},
 	}
 
-	if err := svc.SeedPermissions(perms); err != nil {
+	if err := svc.Permissions().Seed(perms); err != nil {
 		t.Fatal(err)
 	}
 
@@ -39,7 +41,7 @@ func TestPermission(t *testing.T) {
 	}
 
 	// two consecutives seeds should not error
-	if err := svc.SeedPermissions(perms); err != nil {
+	if err := svc.Permissions().Seed(perms); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -39,7 +39,13 @@ func (p Permissions) Has(name string) bool {
 	return false
 }
 
-func (s *Service) SeedPermissions(perms []Permission) error {
+type PermissionPgxRepo struct{ db pgxx.DB }
+
+func NewPermissionPgxRepo(db pgxx.DB) *PermissionPgxRepo {
+	return &PermissionPgxRepo{db}
+}
+
+func (r *PermissionPgxRepo) Seed(perms []Permission) error {
 	var (
 		i     = 1
 		parts []string
@@ -53,7 +59,7 @@ func (s *Service) SeedPermissions(perms []Permission) error {
 	}
 
 	sql := fmt.Sprintf("insert into permissions (name, description, type) values %s on conflict (name) do nothing returning id", strings.Join(parts, ", "))
-	rows, err := s.db.Query(ctx, sql, args...)
+	rows, err := r.db.Query(ctx, sql, args...)
 	if err != nil {
 		return err
 	}
@@ -71,8 +77,8 @@ func (s *Service) SeedPermissions(perms []Permission) error {
 	return rows.Err()
 }
 
-// Permissions lists all permissions
-func (s *Service) Permissions() (Permissions, error) {
+// List lists all permissions
+func (s *PermissionPgxRepo) List() (Permissions, error) {
 	var perms []Permission
 	err := pgxx.Many(s.db, &perms, "order by name asc")
 	if err != nil {
@@ -81,18 +87,18 @@ func (s *Service) Permissions() (Permissions, error) {
 	return perms, nil
 }
 
-func (s *Service) CreatePermission(p *Permission) error {
+func (s *PermissionPgxRepo) Add(p *Permission) error {
 	return pgxx.Insert(s.db, p)
 }
 
-func (s *Service) UpdatePermission(p *Permission) error {
+func (s *PermissionPgxRepo) Update(p *Permission) error {
 	return pgxx.Update(s.db, p)
 }
 
-func (s *Service) ClearPermissions() error {
+func (s *PermissionPgxRepo) Clear() error {
 	return pgxx.Exec(s.db, "delete from permissions")
 }
 
-func (s *Service) DeletePermission(id pgxx.ID) error {
+func (s *PermissionPgxRepo) Remove(id pgxx.ID) error {
 	return pgxx.Exec(s.db, "delete from permissions where id = $1", id)
 }
