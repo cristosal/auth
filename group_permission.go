@@ -3,12 +3,12 @@ package auth
 import "github.com/cristosal/pgxx"
 
 // GroupPermission represents the union between a group and a permission
-// it can contain a value for use in application
+// it can contains a value for use in application logic
 type GroupPermission struct {
 	GroupID      pgxx.ID
 	PermissionID pgxx.ID
-	Priority     int    `db:"-"`
-	Name         string `db:"-"`
+	Priority     int    `db:"-"` // group priority value
+	Name         string `db:"-"` // permission name
 	Value        int
 }
 
