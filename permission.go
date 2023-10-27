@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/cristosal/pgxx"
 )
@@ -45,36 +46,35 @@ func NewPermissionPgxRepo(db pgxx.DB) *PermissionPgxRepo {
 	return &PermissionPgxRepo{db}
 }
 
-func (r *PermissionPgxRepo) Seed(perms []Permission) error {
+func (r *PermissionPgxRepo) Seed(permissions []Permission) error {
 	var (
 		i     = 1
 		parts []string
 		args  []any
 	)
 
-	for _, v := range perms {
+	for _, v := range permissions {
 		parts = append(parts, fmt.Sprintf("($%d, $%d, $%d)", i, i+1, i+2))
 		args = append(args, v.Name, v.Description, v.Type)
 		i += 3
 	}
 
-	sql := fmt.Sprintf("insert into permissions (name, description, type) values %s on conflict (name) do nothing returning id", strings.Join(parts, ", "))
-	rows, err := r.db.Query(ctx, sql, args...)
-	if err != nil {
+	sql := fmt.Sprintf("insert into permissions (name, description, type) values %s on conflict (name) do nothing", strings.Join(parts, ", "))
+	if err := pgxx.Exec(r.db, sql, args...); err != nil {
 		return err
 	}
 
-	defer rows.Close()
-
-	i = 0
-	for rows.Next() {
-		if err := rows.Scan(&perms[i].ID); err != nil {
-			return err
-		}
-		i++
+	wg := new(sync.WaitGroup)
+	for i := range permissions {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			pgxx.One(r.db, &permissions[i], "where name = $1", permissions[i].Name)
+		}(i)
 	}
 
-	return rows.Err()
+	wg.Wait()
+	return nil
 }
 
 // List lists all permissions

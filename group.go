@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/cristosal/pgxx"
 )
@@ -53,23 +54,23 @@ func (r *GroupPgxRepo) Seed(groups []Group) error {
 		i += 3
 	}
 
-	sql := fmt.Sprintf("insert into groups (name, description, priority) values %s on conflict (name) do nothing returning id", strings.Join(parts, ", "))
-	rows, err := r.db.Query(ctx, sql, args...)
+	sql := fmt.Sprintf("insert into groups (name, description, priority) values %s on conflict (name) do nothing", strings.Join(parts, ", "))
+	err := pgxx.Exec(r.db, sql, args...)
 	if err != nil {
 		return err
 	}
 
-	defer rows.Close()
-
-	i = 0
-	for rows.Next() {
-		if err := rows.Scan(&groups[i].ID); err != nil {
-			return err
-		}
-		i++
+	wg := new(sync.WaitGroup)
+	for i := range groups {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			pgxx.One(r.db, &groups[i], "where name = $1", groups[i].Name)
+		}(i)
 	}
 
-	return rows.Err()
+	wg.Wait()
+	return nil
 }
 
 // AddUser adds a user to a group.

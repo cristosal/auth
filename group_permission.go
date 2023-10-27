@@ -1,6 +1,8 @@
 package auth
 
-import "github.com/cristosal/pgxx"
+import (
+	"github.com/cristosal/pgxx"
+)
 
 // GroupPermission represents the union between a group and a permission
 // it can contains a value for use in application logic
@@ -148,7 +150,7 @@ func (r *GroupPgxRepo) Permissions(gid pgxx.ID) (GroupPermissions, error) {
 }
 
 func (r *GroupPgxRepo) AddPermission(gid, pid pgxx.ID, value int) error {
-	return pgxx.Exec(r.db, "insert into group_permissions (group_id, permission_id, value) values ($1, $2, $3)", gid, pid, value)
+	return pgxx.Exec(r.db, "insert into group_permissions (group_id, permission_id, value) values ($1, $2, $3) on conflict do nothing", gid, pid, value)
 }
 
 func (r *GroupPgxRepo) RemovePermission(gid, pid pgxx.ID) error {
