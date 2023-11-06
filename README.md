@@ -13,6 +13,9 @@ Easy to use Authentication library for go.
 - Password Resets
 - Registration Confirmations
 
+## Installation
+`go get -u github.com/cristosal/auth`
+
 ## Usage
 
 Create a new service using an existing pgx connection
