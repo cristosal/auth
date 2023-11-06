@@ -58,5 +58,4 @@ rcl := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_ADDR")})
 limiter := auth.NewRedisRateLimiter(rcl)
 ```
 
-## API
 
