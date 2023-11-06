@@ -27,18 +27,17 @@ type (
 		Permissions GroupPermissions `json:"permissions,omitempty"`
 		ExpiresAt   time.Time        `json:"expires_at"`
 		UserAgent   string           `json:"user_agent"`
-		Message     string           `json:"message"` // for flash messages
+		Message     string           `json:"message"`
 		MessageType string           `json:"message_type"`
 		IP          string           `json:"ip"` // Source IP Address
 		Meta        map[string]any   `json:"meta"`
 	}
 )
 
-func NewSession() Session {
-	sid, _ := GenerateToken(16)
+func NewSession(expiresAt time.Time) Session {
 	return Session{
-		ID:   sid,
-		Meta: make(map[string]any),
+		Meta:      make(map[string]any),
+		ExpiresAt: expiresAt,
 	}
 }
 
