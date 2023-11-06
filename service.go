@@ -11,6 +11,7 @@ type PgxService struct {
 	permission *PermissionPgxRepo
 	user       *UserPgxService
 	group      *GroupPgxRepo
+	sessions   *PgxSessionStore
 }
 
 var ctx = context.Background()
@@ -21,7 +22,12 @@ func NewPgxService(db pgxx.DB) *PgxService {
 		permission: NewPermissionPgxRepo(db),
 		group:      NewGroupPgxRepo(db),
 		user:       NewUserPgxService(db),
+		sessions:   NewPgxSessionStore(db),
 	}
+}
+
+func (s *PgxService) Sessions() *PgxSessionStore {
+	return s.sessions
 }
 
 func (s *PgxService) Users() *UserPgxService {
