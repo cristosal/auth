@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-	"sync"
 	"time"
 
 	"github.com/cristosal/pgxx"
@@ -42,8 +40,9 @@ func NewSessionStore(conn pgxx.DB, rd *redis.Client) SessionStore {
 }
 
 // FindSession returns the session with the given id from the store.
-func (s sessionStore) FindSession(id string) (*Session, error) {
-	data, err := s.Get(s.keyify(id)).Result()
+func (s sessionStore) FindSession(sid string) (*Session, error) {
+	data, err := s.Get(s.sessionKey(sid)).Result()
+
 	if errors.Is(err, redis.Nil) {
 		return nil, ErrSessionNotFound
 	}
@@ -67,54 +66,25 @@ func (s sessionStore) FindSession(id string) (*Session, error) {
 }
 
 func (s sessionStore) UserSessions(uid pgxx.ID) ([]Session, error) {
-	rows, err := s.Query(ctx, "select session_id from sessions where user_id = $1", uid)
+	key := s.userSessionKey(uid.String())
+	sessionKeys, err := s.SMembers(key).Result()
 	if err != nil {
 		return nil, err
 	}
 
-	sids, err := pgxx.CollectStrings(rows)
+	results, err := s.MGet(sessionKeys...).Result()
 	if err != nil {
-		// can be db.NotFound error
 		return nil, err
 	}
-
-	sessch := make(chan Session)
-	wg := new(sync.WaitGroup)
-	wg.Add(len(sids))
-	for i := range sids {
-		go func(i int) {
-			defer wg.Done()
-			defer recover()
-			res := s.Get(s.keyify(sids[i]))
-			if res.Err() != nil {
-				if errors.Is(err, redis.Nil) {
-					go s.RemoveSession(sids[i])
-				}
-				return
-			}
-
-			data, err := res.Bytes()
-			if err != nil {
-				log.Printf("unable to get bytes from session: %v", err)
-				return
-			}
-
-			var sess Session
-			if err := json.Unmarshal(data, &sess); err != nil {
-				log.Printf("unable to unmarshal session data: %v", err)
-				return
-			}
-			sessch <- sess
-		}(i)
-	}
-
-	go func() {
-		wg.Wait()
-		close(sessch)
-	}()
 
 	var sessions []Session
-	for sess := range sessch {
+	for i := range results {
+		var sess Session
+
+		if err := json.Unmarshal([]byte(results[i].(string)), &sess); err != nil {
+			return sessions, err
+		}
+
 		sessions = append(sessions, sess)
 	}
 
@@ -122,33 +92,14 @@ func (s sessionStore) UserSessions(uid pgxx.ID) ([]Session, error) {
 }
 
 func (s sessionStore) DeleteUserSessions(uid pgxx.ID) error {
-	rows, err := s.Query(ctx, "select session_id from sessions where user_id = $1", uid)
-	if err != nil {
-		return err
-	}
-	sids, err := pgxx.CollectStrings(rows)
-	if err != nil {
-		return err
-	}
-
-	// replace with redis session key
-	for i := range sids {
-		sids[i] = s.keyify(sids[i])
-	}
-
-	cmd := s.Del(sids...)
-	if err := cmd.Err(); err != nil {
-		return err
-	}
-
-	return pgxx.Exec(s, "delete from sessions where user_id = $1", uid)
+	return s.Del(s.userSessionKey(uid.String())).Err()
 }
 
 func (s sessionStore) UpdateSession(sess *Session) error {
 	return pgxx.Exec(s, "update sessions set user_id = $1, user_agent = $2, expires_at = $3 where session_id = $4", sess.UserID(), sess.UserAgent, sess.ExpiresAt, sess.ID)
 }
 
-// CreateSession in database and redis
+// CreateSession adds session to database and redis
 func (s sessionStore) CreateSession(sess *Session) error {
 	data, err := json.Marshal(sess)
 	if err != nil {
@@ -156,7 +107,7 @@ func (s sessionStore) CreateSession(sess *Session) error {
 	}
 
 	// persist into redis
-	cmd := s.Set(s.keyify(sess.ID), data, 0)
+	cmd := s.Set(s.sessionKey(sess.ID), data, 0)
 	if err := cmd.Err(); err != nil {
 		return err
 	}
@@ -166,6 +117,15 @@ func (s sessionStore) CreateSession(sess *Session) error {
 
 // SaveSession session in redis
 func (s sessionStore) SaveSession(sess *Session) error {
+	if sess.ID == "" {
+		sid, err := GenerateToken(16)
+		if err != nil {
+			return err
+		}
+
+		sess.ID = sid
+	}
+
 	if sess.Expired() {
 		return ErrSessionExpired
 	}
@@ -178,23 +138,19 @@ func (s sessionStore) SaveSession(sess *Session) error {
 		return err
 	}
 
-	var expires time.Duration
-	if sess.Counter < 2 {
-		expires = time.Minute
-	} else {
-		expires = time.Until(sess.ExpiresAt)
-	}
+	expires := time.Until(sess.ExpiresAt)
+	key := s.sessionKey(sess.ID)
 
-	cmd := s.Set(s.keyify(sess.ID), data, expires)
-	if err := cmd.Err(); err != nil {
+	if err := s.Set(key, data, expires).Err(); err != nil {
 		return err
 	}
 
-	if sess.dirty {
-		sess.dirty = false
-		// store user session in database
-		if err := s.CreateSession(sess); err != nil {
-			log.Printf("error saving session to db: %v", err)
+	if !sess.IsAnonymous() {
+		userKey := s.userSessionKey(sess.UserID().String())
+
+		// add to set but how do we remove after?
+		if err := s.SAdd(userKey, key).Err(); err != nil {
+			return err
 		}
 	}
 
@@ -203,7 +159,7 @@ func (s sessionStore) SaveSession(sess *Session) error {
 
 // RemoveSession session from cache and db
 func (s sessionStore) RemoveSession(sid string) error {
-	_ = s.Del(s.keyify(sid))
+	_ = s.Del(s.sessionKey(sid))
 	return pgxx.Exec(s, "delete from sessions where session_id = $1", sid)
 }
 
@@ -211,6 +167,10 @@ func (s sessionStore) DeleteExpiredSessions() error {
 	return pgxx.Exec(s, "delete from sessions where expires_at < now()")
 }
 
-func (sessionStore) keyify(id string) string {
+func (sessionStore) userSessionKey(uid string) string {
+	return fmt.Sprintf("%s:%s", userKey, uid)
+}
+
+func (sessionStore) sessionKey(id string) string {
 	return fmt.Sprintf("%s:%s", sessionKey, id)
 }

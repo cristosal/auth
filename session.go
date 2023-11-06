@@ -11,6 +11,7 @@ import (
 
 const (
 	sessionKey          = key("session")
+	userKey             = key("user_session")
 	SessionDuration     = time.Hour * 3
 	SessionLongDuration = time.Hour * 24 * 30
 )
@@ -20,17 +21,16 @@ type (
 
 	Session struct {
 		ID          string           `json:"id"`
-		Counter     int              `json:"counter"`
+		Counter     int              `json:"counter"` // the amount of times the session has been saved
 		User        *User            `json:"user,omitempty"`
-		Permissions GroupPermissions `json:"permissions,omitempty"`
 		Groups      Groups           `json:"groups,omitempty"`
-		UserAgent   string           `json:"user_agent"`
+		Permissions GroupPermissions `json:"permissions,omitempty"`
 		ExpiresAt   time.Time        `json:"expires_at"`
-		Message     string           `json:"message"`
+		UserAgent   string           `json:"user_agent"`
+		Message     string           `json:"message"` // for flash messages
 		MessageType string           `json:"message_type"`
-		IP          string           `json:"ip"`
+		IP          string           `json:"ip"` // Source IP Address
 		Meta        map[string]any   `json:"meta"`
-		dirty       bool
 	}
 )
 
@@ -40,10 +40,6 @@ func NewSession() Session {
 		ID:   sid,
 		Meta: make(map[string]any),
 	}
-}
-
-func (s *Session) MarkDirty() {
-	s.dirty = true // means save to db
 }
 
 func (s *Session) UserID() *pgxx.ID {
