@@ -57,12 +57,13 @@ func (s *PgxService) Init() error {
 		);
 
 		create table if not exists sessions (
-			session_id varchar(64) not null primary key,
+			id varchar(64) primary key not null,
 			user_id int,
-			user_agent varchar(1024),
+			data jsonb not null,
+			created_at timestamptz not null default now(),
+			updated_at timestamptz not null default now(),
 			expires_at timestamptz not null,
-			created_at timestamptz not null default current_timestamp,
-			foreign key (user_id) references users(id) on delete cascade
+			foreign key (user_id) references users(id)
 		);
 
 		create table if not exists pass_tokens (
