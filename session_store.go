@@ -25,18 +25,18 @@ type (
 	}
 
 	RedisSessionStore struct {
-		client *redis.Client
+		redis *redis.Client
 	}
 )
 
 // Creates a new redis backed session store
 func NewSessionStore(conn pgxx.DB, rd *redis.Client) *RedisSessionStore {
-	return &RedisSessionStore{client: rd}
+	return &RedisSessionStore{redis: rd}
 }
 
 // ByID returns the session with the given id from the store.
 func (s RedisSessionStore) ByID(sid string) (*Session, error) {
-	data, err := s.client.Get(s.sessionKey(sid)).Result()
+	data, err := s.redis.Get(s.sessionKey(sid)).Result()
 
 	if errors.Is(err, redis.Nil) {
 		return nil, ErrSessionNotFound
@@ -63,12 +63,12 @@ func (s RedisSessionStore) ByID(sid string) (*Session, error) {
 // ByUserID returns all sessions belonging to the given user
 func (s RedisSessionStore) ByUserID(uid pgxx.ID) ([]Session, error) {
 	key := s.userSessionKey(uid.String())
-	sessionKeys, err := s.client.SMembers(key).Result()
+	sessionKeys, err := s.redis.SMembers(key).Result()
 	if err != nil {
 		return nil, err
 	}
 
-	results, err := s.client.MGet(sessionKeys...).Result()
+	results, err := s.redis.MGet(sessionKeys...).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -100,22 +100,22 @@ func (s RedisSessionStore) DeleteByUserID(uid pgxx.ID) error {
 	}
 
 	// delete user sessions
-	if err := s.client.Del(s.userSessionKey(uid.String())).Err(); err != nil {
+	if err := s.redis.Del(s.userSessionKey(uid.String())).Err(); err != nil {
 		return err
 	}
 
-	return s.client.Del(keys...).Err()
+	return s.redis.Del(keys...).Err()
 }
 
 // Delete session from cache and db
 func (s RedisSessionStore) Delete(sess *Session) error {
-	if err := s.client.Del(s.sessionKey(sess.ID)).Err(); err != nil {
+	if err := s.redis.Del(s.sessionKey(sess.ID)).Err(); err != nil {
 		return err
 	}
 
 	// cascade into user
 	if !sess.IsAnonymous() {
-		return s.client.Del(s.userSessionKey(sess.UserID().String())).Err()
+		return s.redis.Del(s.userSessionKey(sess.UserID().String())).Err()
 	}
 
 	return nil
@@ -143,7 +143,7 @@ func (s RedisSessionStore) Save(sess *Session) error {
 	expires := time.Until(sess.ExpiresAt)
 	key := s.sessionKey(sess.ID)
 
-	if err := s.client.Set(key, data, expires).Err(); err != nil {
+	if err := s.redis.Set(key, data, expires).Err(); err != nil {
 		return err
 	}
 
@@ -151,7 +151,7 @@ func (s RedisSessionStore) Save(sess *Session) error {
 		userKey := s.userSessionKey(sess.UserID().String())
 
 		// add to set but how do we remove after?
-		if err := s.client.SAdd(userKey, key).Err(); err != nil {
+		if err := s.redis.SAdd(userKey, key).Err(); err != nil {
 			return err
 		}
 	}
