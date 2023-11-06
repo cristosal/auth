@@ -15,7 +15,7 @@ Easy to use Authentication library for go.
 
 ## Usage
 
-to create use auth simply create a new service using an existing pgx connection
+Create a new service using an existing pgx connection
 
 ```go
 
@@ -39,4 +39,12 @@ authService.Groups()
 
 // sessions api
 authService.Sessions()
+```
+
+If you want to use rate limiting, pass in a redis client
+
+```go
+rcl := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_ADDR")})
+
+limiter := auth.NewRedisRateLimiter(rcl)
 ```
