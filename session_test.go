@@ -27,7 +27,7 @@ func TestUserSessions(t *testing.T) {
 		Name: "Test User",
 	}
 
-	if err := store.SaveSession(&sess); err != nil {
+	if err := store.Save(&sess); err != nil {
 		t.Fatal(err)
 	}
 

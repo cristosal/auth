@@ -17,31 +17,26 @@ var (
 
 type (
 	SessionStore interface {
-		FindSession(id string) (*Session, error)
-		CreateSession(sess *Session) error
-		SaveSession(sess *Session) error
+		Get(sid string) (*Session, error)
+		Save(s *Session) error
 		UserSessions(uid pgxx.ID) ([]Session, error)
 		DeleteUserSessions(uid pgxx.ID) error
-		RemoveSession(id string) error
+		Delete(s *Session) error
 	}
 
-	sessionStore struct {
-		*redis.Client
-		pgxx.DB
+	RedisSessionStore struct {
+		client *redis.Client
 	}
 )
 
-// Creates a new redis Store
-func NewSessionStore(conn pgxx.DB, rd *redis.Client) SessionStore {
-	return &sessionStore{
-		rd,
-		conn,
-	}
+// Creates a new redis backed session store
+func NewSessionStore(conn pgxx.DB, rd *redis.Client) *RedisSessionStore {
+	return &RedisSessionStore{client: rd}
 }
 
-// FindSession returns the session with the given id from the store.
-func (s sessionStore) FindSession(sid string) (*Session, error) {
-	data, err := s.Get(s.sessionKey(sid)).Result()
+// Get returns the session with the given id from the store.
+func (s RedisSessionStore) Get(sid string) (*Session, error) {
+	data, err := s.client.Get(s.sessionKey(sid)).Result()
 
 	if errors.Is(err, redis.Nil) {
 		return nil, ErrSessionNotFound
@@ -58,21 +53,22 @@ func (s sessionStore) FindSession(sid string) (*Session, error) {
 
 	if sess.Expired() {
 		// remove session in the background
-		go s.RemoveSession(sess.ID)
+		go s.Delete(&sess)
 		return nil, ErrSessionExpired
 	}
 
 	return &sess, nil
 }
 
-func (s sessionStore) UserSessions(uid pgxx.ID) ([]Session, error) {
+// UserSessions returns all sessions belonging to the given user
+func (s RedisSessionStore) UserSessions(uid pgxx.ID) ([]Session, error) {
 	key := s.userSessionKey(uid.String())
-	sessionKeys, err := s.SMembers(key).Result()
+	sessionKeys, err := s.client.SMembers(key).Result()
 	if err != nil {
 		return nil, err
 	}
 
-	results, err := s.MGet(sessionKeys...).Result()
+	results, err := s.client.MGet(sessionKeys...).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +76,6 @@ func (s sessionStore) UserSessions(uid pgxx.ID) ([]Session, error) {
 	var sessions []Session
 	for i := range results {
 		var sess Session
-
 		if err := json.Unmarshal([]byte(results[i].(string)), &sess); err != nil {
 			return sessions, err
 		}
@@ -91,32 +86,13 @@ func (s sessionStore) UserSessions(uid pgxx.ID) ([]Session, error) {
 	return sessions, nil
 }
 
-func (s sessionStore) DeleteUserSessions(uid pgxx.ID) error {
-	return s.Del(s.userSessionKey(uid.String())).Err()
+// DeleteUserSessions delets all sessions for given user
+func (s RedisSessionStore) DeleteUserSessions(uid pgxx.ID) error {
+	return s.client.Del(s.userSessionKey(uid.String())).Err()
 }
 
-func (s sessionStore) UpdateSession(sess *Session) error {
-	return pgxx.Exec(s, "update sessions set user_id = $1, user_agent = $2, expires_at = $3 where session_id = $4", sess.UserID(), sess.UserAgent, sess.ExpiresAt, sess.ID)
-}
-
-// CreateSession adds session to database and redis
-func (s sessionStore) CreateSession(sess *Session) error {
-	data, err := json.Marshal(sess)
-	if err != nil {
-		return err
-	}
-
-	// persist into redis
-	cmd := s.Set(s.sessionKey(sess.ID), data, 0)
-	if err := cmd.Err(); err != nil {
-		return err
-	}
-
-	return pgxx.Exec(s, "insert into sessions (session_id, user_id, user_agent, expires_at) values ($1, $2, $3, $4)", sess.ID, sess.UserID(), sess.UserAgent, sess.ExpiresAt)
-}
-
-// SaveSession session in redis
-func (s sessionStore) SaveSession(sess *Session) error {
+// Save session in redis store
+func (s RedisSessionStore) Save(sess *Session) error {
 	if sess.ID == "" {
 		sid, err := GenerateToken(16)
 		if err != nil {
@@ -124,10 +100,6 @@ func (s sessionStore) SaveSession(sess *Session) error {
 		}
 
 		sess.ID = sid
-	}
-
-	if sess.Expired() {
-		return ErrSessionExpired
 	}
 
 	// increment the save counter
@@ -141,7 +113,7 @@ func (s sessionStore) SaveSession(sess *Session) error {
 	expires := time.Until(sess.ExpiresAt)
 	key := s.sessionKey(sess.ID)
 
-	if err := s.Set(key, data, expires).Err(); err != nil {
+	if err := s.client.Set(key, data, expires).Err(); err != nil {
 		return err
 	}
 
@@ -149,7 +121,7 @@ func (s sessionStore) SaveSession(sess *Session) error {
 		userKey := s.userSessionKey(sess.UserID().String())
 
 		// add to set but how do we remove after?
-		if err := s.SAdd(userKey, key).Err(); err != nil {
+		if err := s.client.SAdd(userKey, key).Err(); err != nil {
 			return err
 		}
 	}
@@ -157,20 +129,24 @@ func (s sessionStore) SaveSession(sess *Session) error {
 	return nil
 }
 
-// RemoveSession session from cache and db
-func (s sessionStore) RemoveSession(sid string) error {
-	_ = s.Del(s.sessionKey(sid))
-	return pgxx.Exec(s, "delete from sessions where session_id = $1", sid)
+// Delete session from cache and db
+func (s RedisSessionStore) Delete(sess *Session) error {
+	if err := s.client.Del(s.sessionKey(sess.ID)).Err(); err != nil {
+		return err
+	}
+
+	// cascade into user
+	if !sess.IsAnonymous() {
+		return s.client.Del(s.userSessionKey(sess.UserID().String())).Err()
+	}
+
+	return nil
 }
 
-func (s sessionStore) DeleteExpiredSessions() error {
-	return pgxx.Exec(s, "delete from sessions where expires_at < now()")
-}
-
-func (sessionStore) userSessionKey(uid string) string {
+func (RedisSessionStore) userSessionKey(uid string) string {
 	return fmt.Sprintf("%s:%s", userKey, uid)
 }
 
-func (sessionStore) sessionKey(id string) string {
+func (RedisSessionStore) sessionKey(id string) string {
 	return fmt.Sprintf("%s:%s", sessionKey, id)
 }
