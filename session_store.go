@@ -17,11 +17,11 @@ var (
 
 type (
 	SessionStore interface {
-		Get(sid string) (*Session, error)
+		ByID(sid string) (*Session, error)
+		ByUserID(uid pgxx.ID) ([]Session, error)
 		Save(s *Session) error
-		UserSessions(uid pgxx.ID) ([]Session, error)
-		DeleteUserSessions(uid pgxx.ID) error
 		Delete(s *Session) error
+		DeleteByUserID(uid pgxx.ID) error
 	}
 
 	RedisSessionStore struct {
@@ -34,8 +34,8 @@ func NewSessionStore(conn pgxx.DB, rd *redis.Client) *RedisSessionStore {
 	return &RedisSessionStore{client: rd}
 }
 
-// Get returns the session with the given id from the store.
-func (s RedisSessionStore) Get(sid string) (*Session, error) {
+// ByID returns the session with the given id from the store.
+func (s RedisSessionStore) ByID(sid string) (*Session, error) {
 	data, err := s.client.Get(s.sessionKey(sid)).Result()
 
 	if errors.Is(err, redis.Nil) {
@@ -60,8 +60,8 @@ func (s RedisSessionStore) Get(sid string) (*Session, error) {
 	return &sess, nil
 }
 
-// UserSessions returns all sessions belonging to the given user
-func (s RedisSessionStore) UserSessions(uid pgxx.ID) ([]Session, error) {
+// ByUserID returns all sessions belonging to the given user
+func (s RedisSessionStore) ByUserID(uid pgxx.ID) ([]Session, error) {
 	key := s.userSessionKey(uid.String())
 	sessionKeys, err := s.client.SMembers(key).Result()
 	if err != nil {
@@ -86,9 +86,39 @@ func (s RedisSessionStore) UserSessions(uid pgxx.ID) ([]Session, error) {
 	return sessions, nil
 }
 
-// DeleteUserSessions delets all sessions for given user
-func (s RedisSessionStore) DeleteUserSessions(uid pgxx.ID) error {
-	return s.client.Del(s.userSessionKey(uid.String())).Err()
+// DeleteByUserID delets all sessions for given user
+func (s RedisSessionStore) DeleteByUserID(uid pgxx.ID) error {
+	// we need to get all members and cascading into the otherones
+	sessions, err := s.ByUserID(uid)
+	if err != nil {
+		return err
+	}
+
+	var keys []string
+	for i := range sessions {
+		keys = append(keys, sessions[i].ID)
+	}
+
+	// delete user sessions
+	if err := s.client.Del(s.userSessionKey(uid.String())).Err(); err != nil {
+		return err
+	}
+
+	return s.client.Del(keys...).Err()
+}
+
+// Delete session from cache and db
+func (s RedisSessionStore) Delete(sess *Session) error {
+	if err := s.client.Del(s.sessionKey(sess.ID)).Err(); err != nil {
+		return err
+	}
+
+	// cascade into user
+	if !sess.IsAnonymous() {
+		return s.client.Del(s.userSessionKey(sess.UserID().String())).Err()
+	}
+
+	return nil
 }
 
 // Save session in redis store
@@ -124,20 +154,6 @@ func (s RedisSessionStore) Save(sess *Session) error {
 		if err := s.client.SAdd(userKey, key).Err(); err != nil {
 			return err
 		}
-	}
-
-	return nil
-}
-
-// Delete session from cache and db
-func (s RedisSessionStore) Delete(sess *Session) error {
-	if err := s.client.Del(s.sessionKey(sess.ID)).Err(); err != nil {
-		return err
-	}
-
-	// cascade into user
-	if !sess.IsAnonymous() {
-		return s.client.Del(s.userSessionKey(sess.UserID().String())).Err()
 	}
 
 	return nil

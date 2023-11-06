@@ -18,7 +18,7 @@ func TestUserSessions(t *testing.T) {
 	sess := auth.NewSession()
 	sess.ExpiresAt = time.Now().Add(time.Minute)
 
-	if err := store.DeleteUserSessions(1); err != nil {
+	if err := store.DeleteByUserID(1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -31,7 +31,7 @@ func TestUserSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	userSessions, err := store.UserSessions(1)
+	userSessions, err := store.ByUserID(1)
 	if err != nil {
 		t.Fatal(err)
 	}
