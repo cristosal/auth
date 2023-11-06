@@ -1,19 +1,59 @@
 package auth_test
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/cristosal/auth"
 	"github.com/go-redis/redis/v7"
+	"github.com/jackc/pgx/v5"
 )
+
+func TestPgxSessionStore(t *testing.T) {
+	db, err := pgx.Connect(context.Background(), os.Getenv("CONNECTION_STRING"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pgxStore := auth.NewPgxSessionStore(db)
+	pgxStore.Drop()
+
+	if err := pgxStore.Init(); err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		sess    = auth.NewSession(time.Now().Add(time.Minute))
+		msgType = "success"
+		msg     = "flash message"
+	)
+	sess.Flash(msgType, msg)
+
+	if err := pgxStore.Save(&sess); err != nil {
+		t.Fatal(err)
+	}
+
+	found, err := pgxStore.ByID(sess.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if found.Message != msg {
+		t.Fatal("expected message to match")
+	}
+
+	if found.MessageType != msgType {
+		t.Fatal("expected message types to match")
+	}
+
+}
 
 func TestUserSessions(t *testing.T) {
 	rd := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_ADDR")})
 	store := auth.NewRedisSessionStore(rd)
-	sess := auth.NewSession()
-	sess.ExpiresAt = time.Now().Add(time.Minute)
+	sess := auth.NewSession(time.Now().Add(time.Minute))
 
 	if err := store.DeleteByUserID(1); err != nil {
 		t.Fatal(err)
@@ -40,8 +80,7 @@ func TestUserSessions(t *testing.T) {
 
 func TestSessionExpired(t *testing.T) {
 	d := time.Second * 2
-	sess := auth.NewSession()
-	sess.ExpiresAt = time.Now().Add(d)
+	sess := auth.NewSession(time.Now().Add(d))
 	if sess.Expired() {
 		t.Fatal("expected session not to be expired")
 	}
