@@ -84,7 +84,7 @@ func (s *PgxSessionStore) Save(sess *Session) error {
 			sid, sess.UserID(), sess, sess.ExpiresAt)
 	}
 
-	return pgxx.Exec(s.db, "update sessions set updated_at = now(), data = $2 where id = $2", sess, sess.ID)
+	return pgxx.Exec(s.db, "update sessions set updated_at = now(), data = $1, user_id = $2 where id = $3", sess, sess.UserID(), sess.ID)
 }
 
 // ByID returns a session by its id
