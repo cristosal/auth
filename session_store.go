@@ -30,7 +30,7 @@ type (
 )
 
 // Creates a new redis backed session store
-func NewSessionStore(conn pgxx.DB, rd *redis.Client) *RedisSessionStore {
+func NewRedisSessionStore(rd *redis.Client) *RedisSessionStore {
 	return &RedisSessionStore{redis: rd}
 }
 

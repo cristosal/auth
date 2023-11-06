@@ -1,20 +1,17 @@
 package auth_test
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/cristosal/auth"
 	"github.com/go-redis/redis/v7"
-	"github.com/jackc/pgx/v5"
 )
 
 func TestUserSessions(t *testing.T) {
-	db, _ := pgx.Connect(context.Background(), os.Getenv("CONNECTION_STRING"))
 	rd := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_ADDR")})
-	store := auth.NewSessionStore(db, rd)
+	store := auth.NewRedisSessionStore(rd)
 	sess := auth.NewSession()
 	sess.ExpiresAt = time.Now().Add(time.Minute)
 
