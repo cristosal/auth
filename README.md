@@ -1,7 +1,7 @@
 # Auth
-Easy to use Authentication library for go. 
+[![Go Reference](https://pkg.go.dev/badge/github.com/cristosal/auth.svg)](https://pkg.go.dev/github.com/cristosal/auth)
 
-**Note: postgres is the only supported database**
+Easy to use postgres backed authentication service for go. 
 
 ## Features
 - Authentication
@@ -15,6 +15,12 @@ Easy to use Authentication library for go.
 
 ## Installation
 `go get -u github.com/cristosal/auth`
+
+## Documentation
+
+View the godoc documentation here
+
+https://pkg.go.dev/github.com/cristosal/auth
 
 ## Usage
 
@@ -51,3 +57,6 @@ rcl := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_ADDR")})
 
 limiter := auth.NewRedisRateLimiter(rcl)
 ```
+
+## API
+
