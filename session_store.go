@@ -69,21 +69,6 @@ func (s *PgxSessionStore) Drop() error {
 	return pgxx.Exec(s.db, "drop table sessions")
 }
 
-// Delete session by id
-func (s *PgxSessionStore) Delete(sess *Session) error {
-	return pgxx.Exec(s.db, "delete from sessions where id = $1", sess.ID)
-}
-
-// DeleteByUserID deletes all sessions for a given user
-func (s *PgxSessionStore) DeleteByUserID(uid pgxx.ID) error {
-	return pgxx.Exec(s.db, "delete from sessions where user_id = $1", uid)
-}
-
-// DeleteExpiredSessions deletes all sessions which have expired
-func (s *PgxSessionStore) DeleteExpiredSessions() error {
-	return pgxx.Exec(s.db, "delete from sessions where expires_at < now()")
-}
-
 // Save upserts session into database
 func (s *PgxSessionStore) Save(sess *Session) error {
 	sess.Counter++
@@ -143,6 +128,21 @@ func (s *PgxSessionStore) ByUserID(uid pgxx.ID) ([]Session, error) {
 	}
 
 	return sessions, nil
+}
+
+// Delete session by id
+func (s *PgxSessionStore) Delete(sess *Session) error {
+	return pgxx.Exec(s.db, "delete from sessions where id = $1", sess.ID)
+}
+
+// DeleteByUserID deletes all sessions for a given user
+func (s *PgxSessionStore) DeleteByUserID(uid pgxx.ID) error {
+	return pgxx.Exec(s.db, "delete from sessions where user_id = $1", uid)
+}
+
+// DeleteExpiredSessions deletes all sessions which have expired
+func (s *PgxSessionStore) DeleteExpiredSessions() error {
+	return pgxx.Exec(s.db, "delete from sessions where expires_at < now()")
 }
 
 // NewRedisSessionStore returns a redis backed session store
