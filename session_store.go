@@ -8,6 +8,7 @@ import (
 
 	"github.com/cristosal/pgxx"
 	"github.com/go-redis/redis/v7"
+	"github.com/jackc/pgx/v5"
 )
 
 var (
@@ -16,6 +17,7 @@ var (
 )
 
 type (
+	// SessionStore is the interface implemented by all stores that handle sessions
 	SessionStore interface {
 		ByID(sid string) (*Session, error)
 		ByUserID(uid pgxx.ID) ([]Session, error)
@@ -24,12 +26,126 @@ type (
 		DeleteByUserID(uid pgxx.ID) error
 	}
 
-	RedisSessionStore struct {
-		redis *redis.Client
+	// PgxSessionStore is a redis backed session store
+	RedisSessionStore struct{ redis *redis.Client }
+
+	// PgxSessionStore is a postgres backed session store
+	PgxSessionStore struct{ db pgxx.DB }
+
+	pgxSessionRow struct {
+		ID        string
+		UserID    *pgxx.ID
+		Data      Session
+		CreatedAt time.Time
+		UpdatedAt time.Time
+		ExpiresAt time.Time
 	}
 )
 
-// Creates a new redis backed session store
+func (pgxSessionRow) TableName() string {
+	return "sessions"
+}
+
+// NewPgxSessionStore returns postgres backed session store
+func NewPgxSessionStore(db pgxx.DB) *PgxSessionStore {
+	return &PgxSessionStore{db}
+}
+
+// Init creates session table
+func (s *PgxSessionStore) Init() error {
+	return pgxx.Exec(s.db, `create table if not exists sessions (
+		id varchar(64) primary key not null,
+		user_id int,
+		data jsonb not null,
+		created_at timestamptz not null default now(),
+		updated_at timestamptz not null default now(),
+		expires_at timestamptz not null,
+		foreign key (user_id) references users(id)
+	)`)
+}
+
+// Drop drops the session table
+func (s *PgxSessionStore) Drop() error {
+	return pgxx.Exec(s.db, "drop table sessions")
+}
+
+// Delete session by id
+func (s *PgxSessionStore) Delete(sess *Session) error {
+	return pgxx.Exec(s.db, "delete from sessions where id = $1", sess.ID)
+}
+
+// DeleteByUserID deletes all sessions for a given user
+func (s *PgxSessionStore) DeleteByUserID(uid pgxx.ID) error {
+	return pgxx.Exec(s.db, "delete from sessions where user_id = $1", uid)
+}
+
+// DeleteExpiredSessions deletes all sessions which have expired
+func (s *PgxSessionStore) DeleteExpiredSessions() error {
+	return pgxx.Exec(s.db, "delete from sessions where expires_at < now()")
+}
+
+// Save upserts session into database
+func (s *PgxSessionStore) Save(sess *Session) error {
+	sess.Counter++
+
+	if sess.ID == "" {
+		sid, err := GenerateToken(16)
+		if err != nil {
+			return err
+		}
+
+		sess.ID = sid
+		return pgxx.Exec(s.db, "insert into sessions (id, user_id, data, expires_at) values ($1, $2, $3, $4)",
+			sid, sess.UserID(), sess, sess.ExpiresAt)
+	}
+
+	return pgxx.Exec(s.db, "update sessions set updated_at = now(), data = $2 where id = $2", sess, sess.ID)
+}
+
+// ByID returns a session by its id
+func (s *PgxSessionStore) ByID(sessionID string) (*Session, error) {
+	var row pgxSessionRow
+	if err := pgxx.One(s.db, &row, "where id = $1", sessionID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+
+		return nil, err
+	}
+
+	if row.Data.Expired() {
+		// we can automatically delete it
+		go s.Delete(&row.Data)
+		return nil, ErrSessionExpired
+	}
+
+	return &row.Data, nil
+}
+
+// ByUserID returns all sessions belonging to a user
+func (s *PgxSessionStore) ByUserID(uid pgxx.ID) ([]Session, error) {
+	var rows []pgxSessionRow
+	if err := pgxx.Many(s.db, &rows, "user_id = $1", uid); err != nil {
+		return nil, err
+	}
+
+	sessions := make([]Session, 0)
+	for i := range rows {
+		sess := rows[i].Data
+
+		// delete expired sessions
+		if sess.Expired() {
+			go s.Delete(&sess)
+			continue
+		}
+
+		sessions = append(sessions, rows[i].Data)
+	}
+
+	return sessions, nil
+}
+
+// NewRedisSessionStore returns a redis backed session store
 func NewRedisSessionStore(rd *redis.Client) *RedisSessionStore {
 	return &RedisSessionStore{redis: rd}
 }
@@ -162,7 +278,6 @@ func (s RedisSessionStore) Save(sess *Session) error {
 func (RedisSessionStore) userSessionKey(uid string) string {
 	return fmt.Sprintf("%s:%s", userKey, uid)
 }
-
 func (RedisSessionStore) sessionKey(id string) string {
 	return fmt.Sprintf("%s:%s", sessionKey, id)
 }
