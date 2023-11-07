@@ -98,12 +98,6 @@ func (s *PgxSessionStore) ByID(sessionID string) (*Session, error) {
 		return nil, err
 	}
 
-	if row.Data.Expired() {
-		// we can automatically delete it
-		go s.Delete(&row.Data)
-		return nil, ErrSessionExpired
-	}
-
 	return &row.Data, nil
 }
 
@@ -116,14 +110,6 @@ func (s *PgxSessionStore) ByUserID(uid pgxx.ID) ([]Session, error) {
 
 	sessions := make([]Session, 0)
 	for i := range rows {
-		sess := rows[i].Data
-
-		// delete expired sessions
-		if sess.Expired() {
-			go s.Delete(&sess)
-			continue
-		}
-
 		sessions = append(sessions, rows[i].Data)
 	}
 
