@@ -3,11 +3,11 @@ package auth
 import (
 	"context"
 
-	"github.com/cristosal/pgxx"
+	"github.com/cristosal/orm"
 )
 
 type PgxService struct {
-	db         pgxx.DB
+	db         orm.DB
 	permission *PermissionPgxRepo
 	user       *UserPgxService
 	group      *GroupPgxRepo
@@ -16,7 +16,7 @@ type PgxService struct {
 
 var ctx = context.Background()
 
-func NewPgxService(db pgxx.DB) *PgxService {
+func NewPgxService(db orm.DB) *PgxService {
 	return &PgxService{
 		db:         db,
 		permission: NewPermissionPgxRepo(db),
@@ -43,7 +43,7 @@ func (s *PgxService) Groups() *GroupPgxRepo {
 }
 
 func (s *PgxService) Init() error {
-	return pgxx.Exec(s.db, `
+	return orm.Exec(s.db, `
 		create table if not exists users (
 			id serial primary key,
 			name varchar(255) not null,

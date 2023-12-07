@@ -3,7 +3,7 @@ package auth
 import (
 	"time"
 
-	"github.com/cristosal/pgxx"
+	"github.com/cristosal/orm"
 )
 
 const (
@@ -11,7 +11,7 @@ const (
 )
 
 type User struct {
-	ID          pgxx.ID    `json:"id"`
+	ID          int64      `json:"id"`
 	Name        string     `json:"name"`
 	Email       string     `json:"email"`
 	Phone       string     `json:"phone"`
@@ -39,9 +39,9 @@ func (u *User) VerifyPassword(pass string) bool {
 	return err == nil
 }
 
-type UserPgxService struct{ db pgxx.DB }
+type UserPgxService struct{ db orm.DB }
 
-func NewUserPgxService(db pgxx.DB) *UserPgxService {
+func NewUserPgxService(db orm.DB) *UserPgxService {
 	return &UserPgxService{db}
 }
 

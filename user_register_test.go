@@ -1,24 +1,23 @@
 package auth_test
 
 import (
-	"context"
+	"database/sql"
 	"errors"
 	"os"
 	"testing"
 
 	"github.com/cristosal/auth"
-	"github.com/jackc/pgx/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func TestRegister(t *testing.T) {
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, os.Getenv("CONNECTION_STRING"))
+	conn, err := sql.Open("pgx", os.Getenv("CONNECTION_STRING"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close(ctx)
+	defer conn.Close()
 
-	_, err = conn.Exec(ctx, "delete from users where email = $1", "pepito@gmail.com")
+	_, err = conn.Exec("delete from users where email = $1", "pepito@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}

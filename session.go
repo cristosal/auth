@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"time"
-
-	"github.com/cristosal/pgxx"
 )
 
 const (
@@ -41,7 +39,7 @@ func NewSession(expiresAt time.Time) Session {
 	}
 }
 
-func (s *Session) UserID() *pgxx.ID {
+func (s *Session) UserID() *int64 {
 	if s.User == nil {
 		return nil
 	}

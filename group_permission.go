@@ -1,14 +1,14 @@
 package auth
 
 import (
-	"github.com/cristosal/pgxx"
+	"github.com/cristosal/orm"
 )
 
 // GroupPermission represents the union between a group and a permission
 // it can contains a value for use in application logic
 type GroupPermission struct {
-	GroupID      pgxx.ID
-	PermissionID pgxx.ID
+	GroupID      int64
+	PermissionID int64
 	Priority     int    `db:"-"` // group priority value
 	Name         string `db:"-"` // permission name
 	Value        int
@@ -48,7 +48,7 @@ func (gps GroupPermissions) Has(name string) bool {
 	return false
 }
 
-func (r *GroupPgxRepo) UserPermissions(uid pgxx.ID) (GroupPermissions, error) {
+func (r *GroupPgxRepo) UserPermissions(uid int64) (GroupPermissions, error) {
 	sql := `select 
 		gp.group_id, 
 		gp.permission_id, 
@@ -72,7 +72,7 @@ func (r *GroupPgxRepo) UserPermissions(uid pgxx.ID) (GroupPermissions, error) {
 	where 
 		gu.user_id = $1`
 
-	rows, err := r.db.Query(ctx, sql, uid)
+	rows, err := r.db.Query(sql, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (r *GroupPgxRepo) UserPermissions(uid pgxx.ID) (GroupPermissions, error) {
 }
 
 // Permissions returns group permissions for a group by group id
-func (r *GroupPgxRepo) Permissions(gid pgxx.ID) (GroupPermissions, error) {
+func (r *GroupPgxRepo) Permissions(gid int64) (GroupPermissions, error) {
 	sql := `select 
 		gp.group_id, 
 		gp.permission_id, 
@@ -121,7 +121,7 @@ func (r *GroupPgxRepo) Permissions(gid pgxx.ID) (GroupPermissions, error) {
 	where 
 		gp.group_id = $1`
 
-	rows, err := r.db.Query(ctx, sql, gid)
+	rows, err := r.db.Query(sql, gid)
 	if err != nil {
 		return nil, err
 	}
@@ -149,10 +149,10 @@ func (r *GroupPgxRepo) Permissions(gid pgxx.ID) (GroupPermissions, error) {
 	return groupPermissions, nil
 }
 
-func (r *GroupPgxRepo) AddPermission(gid, pid pgxx.ID, value int) error {
-	return pgxx.Exec(r.db, "insert into group_permissions (group_id, permission_id, value) values ($1, $2, $3) on conflict do nothing", gid, pid, value)
+func (r *GroupPgxRepo) AddPermission(gid, pid int64, value int) error {
+	return orm.Exec(r.db, "insert into group_permissions (group_id, permission_id, value) values ($1, $2, $3) on conflict do nothing", gid, pid, value)
 }
 
-func (r *GroupPgxRepo) RemovePermission(gid, pid pgxx.ID) error {
-	return pgxx.Exec(r.db, "delete from group_permissions where group_id = $1 and permission_id = $2", gid, pid)
+func (r *GroupPgxRepo) RemovePermission(gid, pid int64) error {
+	return orm.Exec(r.db, "delete from group_permissions where group_id = $1 and permission_id = $2", gid, pid)
 }

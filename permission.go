@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cristosal/pgxx"
+	"github.com/cristosal/orm"
 )
 
 type PermissionType string
@@ -17,7 +17,7 @@ const (
 
 // Permission represents a users access to a resource.
 type Permission struct {
-	ID          pgxx.ID
+	ID          int64
 	Name        string
 	Description string
 	Type        PermissionType
@@ -40,9 +40,9 @@ func (p Permissions) Has(name string) bool {
 	return false
 }
 
-type PermissionPgxRepo struct{ db pgxx.DB }
+type PermissionPgxRepo struct{ db orm.DB }
 
-func NewPermissionPgxRepo(db pgxx.DB) *PermissionPgxRepo {
+func NewPermissionPgxRepo(db orm.DB) *PermissionPgxRepo {
 	return &PermissionPgxRepo{db}
 }
 
@@ -60,7 +60,7 @@ func (r *PermissionPgxRepo) Seed(permissions []Permission) error {
 	}
 
 	sql := fmt.Sprintf("insert into permissions (name, description, type) values %s on conflict (name) do nothing", strings.Join(parts, ", "))
-	if err := pgxx.Exec(r.db, sql, args...); err != nil {
+	if err := orm.Exec(r.db, sql, args...); err != nil {
 		return err
 	}
 
@@ -69,7 +69,7 @@ func (r *PermissionPgxRepo) Seed(permissions []Permission) error {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			pgxx.One(r.db, &permissions[i], "where name = $1", permissions[i].Name)
+			orm.Get(r.db, &permissions[i], "where name = $1", permissions[i].Name)
 		}(i)
 	}
 
@@ -80,7 +80,7 @@ func (r *PermissionPgxRepo) Seed(permissions []Permission) error {
 // List lists all permissions
 func (s *PermissionPgxRepo) List() (Permissions, error) {
 	var perms []Permission
-	err := pgxx.Many(s.db, &perms, "order by name asc")
+	err := orm.List(s.db, &perms, "order by name asc")
 	if err != nil {
 		return nil, err
 	}
@@ -88,17 +88,17 @@ func (s *PermissionPgxRepo) List() (Permissions, error) {
 }
 
 func (s *PermissionPgxRepo) Add(p *Permission) error {
-	return pgxx.Insert(s.db, p)
+	return orm.Add(s.db, p)
 }
 
 func (s *PermissionPgxRepo) Update(p *Permission) error {
-	return pgxx.Update(s.db, p)
+	return orm.UpdateByID(s.db, p)
 }
 
 func (s *PermissionPgxRepo) Clear() error {
-	return pgxx.Exec(s.db, "delete from permissions")
+	return orm.Exec(s.db, "delete from permissions")
 }
 
-func (s *PermissionPgxRepo) Remove(id pgxx.ID) error {
-	return pgxx.Exec(s.db, "delete from permissions where id = $1", id)
+func (s *PermissionPgxRepo) Remove(id int64) error {
+	return orm.Exec(s.db, "delete from permissions where id = $1", id)
 }

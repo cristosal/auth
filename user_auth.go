@@ -3,7 +3,7 @@ package auth
 import (
 	"errors"
 
-	"github.com/cristosal/pgxx"
+	"github.com/cristosal/orm"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -25,7 +25,7 @@ func (s *UserPgxService) Authenticate(email, pass string) (*User, error) {
 		return nil, ErrUnauthorized
 	}
 
-	if err := pgxx.Exec(s.db, "update users set last_login = now() where id = $1", u.ID); err != nil {
+	if err := orm.Exec(s.db, "update users set last_login = now() where id = $1", u.ID); err != nil {
 		return nil, err
 	}
 

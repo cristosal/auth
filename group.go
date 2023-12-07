@@ -5,12 +5,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cristosal/pgxx"
+	"github.com/cristosal/orm"
+	"github.com/cristosal/orm/schema"
 )
 
 type (
 	Group struct {
-		ID          pgxx.ID
+		ID          int64
 		Name        string
 		Description string
 		Priority    int
@@ -33,9 +34,9 @@ func (g *Group) NewPermission(p *Permission, v int) *GroupPermission {
 }
 
 // GroupPgxRepo us a group repository using pgx
-type GroupPgxRepo struct{ db pgxx.DB }
+type GroupPgxRepo struct{ db orm.DB }
 
-func NewGroupPgxRepo(db pgxx.DB) *GroupPgxRepo {
+func NewGroupPgxRepo(db orm.DB) *GroupPgxRepo {
 	return &GroupPgxRepo{db}
 }
 
@@ -55,7 +56,7 @@ func (r *GroupPgxRepo) Seed(groups []Group) error {
 	}
 
 	sql := fmt.Sprintf("insert into groups (name, description, priority) values %s on conflict (name) do nothing", strings.Join(parts, ", "))
-	err := pgxx.Exec(r.db, sql, args...)
+	err := orm.Exec(r.db, sql, args...)
 	if err != nil {
 		return err
 	}
@@ -65,7 +66,7 @@ func (r *GroupPgxRepo) Seed(groups []Group) error {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			pgxx.One(r.db, &groups[i], "where name = $1", groups[i].Name)
+			orm.Get(r.db, &groups[i], "where name = $1", groups[i].Name)
 		}(i)
 	}
 
@@ -75,33 +76,33 @@ func (r *GroupPgxRepo) Seed(groups []Group) error {
 
 // AddUser adds a user to a group.
 // No error will occur if a user is already part of the group
-func (r *GroupPgxRepo) AddUser(uid pgxx.ID, gid pgxx.ID) error {
-	return pgxx.Exec(r.db, "insert into group_users (user_id, group_id) values ($1, $2) on conflict do nothing", uid, gid)
+func (r *GroupPgxRepo) AddUser(uid int64, gid int64) error {
+	return orm.Exec(r.db, "insert into group_users (user_id, group_id) values ($1, $2) on conflict do nothing", uid, gid)
 }
 
 // RemoveUser removes a user from a group
-func (r *GroupPgxRepo) RemoveUser(uid pgxx.ID, gid pgxx.ID) error {
-	return pgxx.Exec(r.db, "delete from group_users where user_id = $1 and group_id = $2", uid, gid)
+func (r *GroupPgxRepo) RemoveUser(uid int64, gid int64) error {
+	return orm.Exec(r.db, "delete from group_users where user_id = $1 and group_id = $2", uid, gid)
 }
 
 // GroupByName finds a group by it's name
 func (r *GroupPgxRepo) ByName(name string) (*Group, error) {
 	var g Group
-	if err := pgxx.One(r.db, &g, "where name = $1", name); err != nil {
+	if err := orm.Get(r.db, &g, "where name = $1", name); err != nil {
 		return nil, err
 	}
 	return &g, nil
 }
 
 // Remove deletes a group by id
-func (r *GroupPgxRepo) Remove(gid pgxx.ID) error {
-	return pgxx.Exec(r.db, "delete from groups where id = $1", gid)
+func (r *GroupPgxRepo) Remove(gid int64) error {
+	return orm.Exec(r.db, "delete from groups where id = $1", gid)
 }
 
 // GroupsByUser returns all groups that user is a part of
-func (r *GroupPgxRepo) ByUser(uid pgxx.ID) (Groups, error) {
+func (r *GroupPgxRepo) ByUser(uid int64) (Groups, error) {
 	var groups []Group
-	if err := pgxx.Many(r.db, &groups, "inner join group_users gu on gu.user_id = $1", uid); err != nil {
+	if err := orm.List(r.db, &groups, "inner join group_users gu on gu.user_id = $1", uid); err != nil {
 		return nil, err
 	}
 	return groups, nil
@@ -110,7 +111,7 @@ func (r *GroupPgxRepo) ByUser(uid pgxx.ID) (Groups, error) {
 // Groups returns all groups ordered by priority (highest first)
 func (r *GroupPgxRepo) List() (Groups, error) {
 	var groups []Group
-	err := pgxx.Many(r.db, &groups, "order by priority desc")
+	err := orm.List(r.db, &groups, "order by priority desc")
 	if err != nil {
 		return nil, err
 	}
@@ -118,9 +119,9 @@ func (r *GroupPgxRepo) List() (Groups, error) {
 }
 
 // GroupByID returns a group by it's id
-func (r *GroupPgxRepo) ByID(id pgxx.ID) (*Group, error) {
+func (r *GroupPgxRepo) ByID(id int64) (*Group, error) {
 	var g Group
-	if err := pgxx.One(r.db, &g, "where id = $1", id); err != nil {
+	if err := orm.Get(r.db, &g, "where id = $1", id); err != nil {
 		return nil, err
 	}
 	return &g, nil
@@ -128,17 +129,17 @@ func (r *GroupPgxRepo) ByID(id pgxx.ID) (*Group, error) {
 
 // Add adds a group
 func (r *GroupPgxRepo) Add(g *Group) error {
-	return pgxx.Insert(r.db, g)
+	return orm.Add(r.db, g)
 }
 
 // Update updates a group with name and priority
 func (r *GroupPgxRepo) Update(g *Group) error {
-	return pgxx.Update(r.db, g)
+	return orm.UpdateByID(r.db, g)
 }
 
 // GroupUserCount counts all users within a group
-func (r *GroupPgxRepo) UserCount(gid pgxx.ID) (int, error) {
-	row := r.db.QueryRow(ctx, "select count(*) from group_users where group_id = $1", gid)
+func (r *GroupPgxRepo) UserCount(gid int64) (int, error) {
+	row := r.db.QueryRow("select count(*) from group_users where group_id = $1", gid)
 	var count int
 	if err := row.Scan(&count); err != nil {
 		return 0, err
@@ -147,13 +148,13 @@ func (r *GroupPgxRepo) UserCount(gid pgxx.ID) (int, error) {
 }
 
 // GroupUsers returns all users within a group
-func (r *GroupPgxRepo) Users(gid pgxx.ID) ([]User, error) {
-	cols := pgxx.MustAnalyze(&User{}).Fields.Columns().PrefixedList("u")
+func (r *GroupPgxRepo) Users(gid int64) ([]User, error) {
+	cols := schema.MustGet(&User{}).Fields.Columns().PrefixedList("u")
 	sql := fmt.Sprintf("select %s from users u inner join group_users gu on u.id = gu.user_id where gu.group_id = $1 order by u.created_at desc", cols)
-	rows, err := r.db.Query(ctx, sql, gid)
+	rows, err := r.db.Query(sql, gid)
 	if err != nil {
 		return nil, err
 	}
 
-	return pgxx.CollectRows[User](rows)
+	return orm.CollectRows[User](rows)
 }

@@ -1,18 +1,18 @@
 package auth_test
 
 import (
-	"context"
+	"database/sql"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/cristosal/auth"
 	"github.com/go-redis/redis/v7"
-	"github.com/jackc/pgx/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func TestPgxSessionStore(t *testing.T) {
-	db, err := pgx.Connect(context.Background(), os.Getenv("CONNECTION_STRING"))
+	db, err := sql.Open("pgx", os.Getenv("CONNECTION_STRING"))
 	if err != nil {
 		t.Fatal(err)
 	}

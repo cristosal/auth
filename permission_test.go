@@ -1,16 +1,16 @@
 package auth_test
 
 import (
-	"context"
+	"database/sql"
 	"os"
 	"testing"
 
 	"github.com/cristosal/auth"
-	"github.com/jackc/pgx/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func NewTestService(t *testing.T) *auth.PgxService {
-	conn, err := pgx.Connect(context.Background(), os.Getenv("CONNECTION_STRING"))
+	conn, err := sql.Open("pgx", os.Getenv("CONNECTION_STRING"))
 	if err != nil {
 		t.Fatal(err)
 	}

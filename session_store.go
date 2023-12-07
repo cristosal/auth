@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cristosal/pgxx"
+	"github.com/cristosal/orm"
 	"github.com/go-redis/redis/v7"
 	"github.com/jackc/pgx/v5"
 )
@@ -20,21 +20,21 @@ type (
 	// SessionStore is the interface implemented by all stores that handle sessions
 	SessionStore interface {
 		ByID(sid string) (*Session, error)
-		ByUserID(uid pgxx.ID) ([]Session, error)
+		ByUserID(uid int64) ([]Session, error)
 		Save(s *Session) error
 		Delete(s *Session) error
-		DeleteByUserID(uid pgxx.ID) error
+		DeleteByUserID(uid int64) error
 	}
 
 	// PgxSessionStore is a redis backed session store
 	RedisSessionStore struct{ redis *redis.Client }
 
 	// PgxSessionStore is a postgres backed session store
-	PgxSessionStore struct{ db pgxx.DB }
+	PgxSessionStore struct{ db orm.DB }
 
 	pgxSessionRow struct {
 		ID        string
-		UserID    *pgxx.ID
+		UserID    *int64
 		Data      Session
 		CreatedAt time.Time
 		UpdatedAt time.Time
@@ -47,13 +47,13 @@ func (pgxSessionRow) TableName() string {
 }
 
 // NewPgxSessionStore returns postgres backed session store
-func NewPgxSessionStore(db pgxx.DB) *PgxSessionStore {
+func NewPgxSessionStore(db orm.DB) *PgxSessionStore {
 	return &PgxSessionStore{db}
 }
 
 // Init creates session table
 func (s *PgxSessionStore) Init() error {
-	return pgxx.Exec(s.db, `create table if not exists sessions (
+	return orm.Exec(s.db, `create table if not exists sessions (
 		id varchar(64) primary key not null,
 		user_id int,
 		data jsonb not null,
@@ -66,7 +66,7 @@ func (s *PgxSessionStore) Init() error {
 
 // Drop drops the session table
 func (s *PgxSessionStore) Drop() error {
-	return pgxx.Exec(s.db, "drop table sessions")
+	return orm.Exec(s.db, "drop table sessions")
 }
 
 // Save upserts session into database
@@ -80,17 +80,17 @@ func (s *PgxSessionStore) Save(sess *Session) error {
 		}
 
 		sess.ID = sid
-		return pgxx.Exec(s.db, "insert into sessions (id, user_id, data, expires_at) values ($1, $2, $3, $4)",
+		return orm.Exec(s.db, "insert into sessions (id, user_id, data, expires_at) values ($1, $2, $3, $4)",
 			sid, sess.UserID(), sess, sess.ExpiresAt)
 	}
 
-	return pgxx.Exec(s.db, "update sessions set updated_at = now(), data = $1, user_id = $2 where id = $3", sess, sess.UserID(), sess.ID)
+	return orm.Exec(s.db, "update sessions set updated_at = now(), data = $1, user_id = $2 where id = $3", sess, sess.UserID(), sess.ID)
 }
 
 // ByID returns a session by its id
 func (s *PgxSessionStore) ByID(sessionID string) (*Session, error) {
 	var row pgxSessionRow
-	if err := pgxx.One(s.db, &row, "where id = $1", sessionID); err != nil {
+	if err := orm.Get(s.db, &row, "where id = $1", sessionID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSessionNotFound
 		}
@@ -102,9 +102,9 @@ func (s *PgxSessionStore) ByID(sessionID string) (*Session, error) {
 }
 
 // ByUserID returns all sessions belonging to a user
-func (s *PgxSessionStore) ByUserID(uid pgxx.ID) ([]Session, error) {
+func (s *PgxSessionStore) ByUserID(uid int64) ([]Session, error) {
 	var rows []pgxSessionRow
-	if err := pgxx.Many(s.db, &rows, "user_id = $1", uid); err != nil {
+	if err := orm.List(s.db, &rows, "user_id = $1", uid); err != nil {
 		return nil, err
 	}
 
@@ -118,17 +118,17 @@ func (s *PgxSessionStore) ByUserID(uid pgxx.ID) ([]Session, error) {
 
 // Delete session by id
 func (s *PgxSessionStore) Delete(sess *Session) error {
-	return pgxx.Exec(s.db, "delete from sessions where id = $1", sess.ID)
+	return orm.Exec(s.db, "delete from sessions where id = $1", sess.ID)
 }
 
 // DeleteByUserID deletes all sessions for a given user
-func (s *PgxSessionStore) DeleteByUserID(uid pgxx.ID) error {
-	return pgxx.Exec(s.db, "delete from sessions where user_id = $1", uid)
+func (s *PgxSessionStore) DeleteByUserID(uid int64) error {
+	return orm.Exec(s.db, "delete from sessions where user_id = $1", uid)
 }
 
 // DeleteExpiredSessions deletes all sessions which have expired
 func (s *PgxSessionStore) DeleteExpiredSessions() error {
-	return pgxx.Exec(s.db, "delete from sessions where expires_at < now()")
+	return orm.Exec(s.db, "delete from sessions where expires_at < now()")
 }
 
 // NewRedisSessionStore returns a redis backed session store
@@ -163,8 +163,8 @@ func (s RedisSessionStore) ByID(sid string) (*Session, error) {
 }
 
 // ByUserID returns all sessions belonging to the given user
-func (s RedisSessionStore) ByUserID(uid pgxx.ID) ([]Session, error) {
-	key := s.userSessionKey(uid.String())
+func (s RedisSessionStore) ByUserID(uid int64) ([]Session, error) {
+	key := s.userSessionKey(string(uid))
 	sessionKeys, err := s.redis.SMembers(key).Result()
 	if err != nil {
 		return nil, err
@@ -189,7 +189,7 @@ func (s RedisSessionStore) ByUserID(uid pgxx.ID) ([]Session, error) {
 }
 
 // DeleteByUserID delets all sessions for given user
-func (s RedisSessionStore) DeleteByUserID(uid pgxx.ID) error {
+func (s RedisSessionStore) DeleteByUserID(uid int64) error {
 	// we need to get all members and cascading into the otherones
 	sessions, err := s.ByUserID(uid)
 	if err != nil {
@@ -202,7 +202,7 @@ func (s RedisSessionStore) DeleteByUserID(uid pgxx.ID) error {
 	}
 
 	// delete user sessions
-	if err := s.redis.Del(s.userSessionKey(uid.String())).Err(); err != nil {
+	if err := s.redis.Del(s.userSessionKey(string(uid))).Err(); err != nil {
 		return err
 	}
 
@@ -217,7 +217,7 @@ func (s RedisSessionStore) Delete(sess *Session) error {
 
 	// cascade into user
 	if !sess.IsAnonymous() {
-		return s.redis.Del(s.userSessionKey(sess.UserID().String())).Err()
+		return s.redis.Del(s.userSessionKey(string(*sess.UserID()))).Err()
 	}
 
 	return nil
@@ -250,7 +250,7 @@ func (s RedisSessionStore) Save(sess *Session) error {
 	}
 
 	if !sess.IsAnonymous() {
-		userKey := s.userSessionKey(sess.UserID().String())
+		userKey := s.userSessionKey(string(*sess.UserID()))
 
 		// add to set but how do we remove after?
 		if err := s.redis.SAdd(userKey, key).Err(); err != nil {
