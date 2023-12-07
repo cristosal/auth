@@ -4,7 +4,7 @@ go 1.21.4
 
 require (
 	github.com/cristosal/migra v1.0.0
-	github.com/cristosal/orm v0.0.1-beta
+	github.com/cristosal/orm v0.0.2-beta
 	github.com/go-redis/redis/v7 v7.4.1
 	github.com/jackc/pgx/v5 v5.5.0
 	golang.org/x/crypto v0.15.0

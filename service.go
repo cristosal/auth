@@ -1,8 +1,6 @@
 package auth
 
 import (
-	"context"
-
 	"github.com/cristosal/orm"
 )
 
@@ -13,8 +11,6 @@ type PgxService struct {
 	group      *GroupPgxRepo
 	sessions   *PgxSessionStore
 }
-
-var ctx = context.Background()
 
 func NewPgxService(db orm.DB) *PgxService {
 	return &PgxService{

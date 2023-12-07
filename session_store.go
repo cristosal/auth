@@ -164,7 +164,7 @@ func (s RedisSessionStore) ByID(sid string) (*Session, error) {
 
 // ByUserID returns all sessions belonging to the given user
 func (s RedisSessionStore) ByUserID(uid int64) ([]Session, error) {
-	key := s.userSessionKey(string(uid))
+	key := s.userSessionKey(fmt.Sprint(uid))
 	sessionKeys, err := s.redis.SMembers(key).Result()
 	if err != nil {
 		return nil, err
@@ -202,7 +202,7 @@ func (s RedisSessionStore) DeleteByUserID(uid int64) error {
 	}
 
 	// delete user sessions
-	if err := s.redis.Del(s.userSessionKey(string(uid))).Err(); err != nil {
+	if err := s.redis.Del(s.userSessionKey(fmt.Sprint(uid))).Err(); err != nil {
 		return err
 	}
 
@@ -217,7 +217,7 @@ func (s RedisSessionStore) Delete(sess *Session) error {
 
 	// cascade into user
 	if !sess.IsAnonymous() {
-		return s.redis.Del(s.userSessionKey(string(*sess.UserID()))).Err()
+		return s.redis.Del(s.userSessionKey(fmt.Sprint(*sess.UserID()))).Err()
 	}
 
 	return nil
@@ -250,7 +250,7 @@ func (s RedisSessionStore) Save(sess *Session) error {
 	}
 
 	if !sess.IsAnonymous() {
-		userKey := s.userSessionKey(string(*sess.UserID()))
+		userKey := s.userSessionKey(fmt.Sprint(*sess.UserID()))
 
 		// add to set but how do we remove after?
 		if err := s.redis.SAdd(userKey, key).Err(); err != nil {
