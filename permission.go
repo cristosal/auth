@@ -102,3 +102,7 @@ func (s *PermissionRepo) Clear() error {
 func (s *PermissionRepo) Remove(id int64) error {
 	return orm.Exec(s.db, "delete from permissions where id = $1", id)
 }
+
+func (s *PermissionRepo) RemoveByName(name string) error {
+	return orm.Exec(s.db, "delete from permissions where name = $1", name)
+}
