@@ -1,12 +1,12 @@
 package auth
 
 import (
+	"database/sql"
 	"errors"
 	"strings"
 	"time"
 
 	"github.com/cristosal/orm"
-	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -14,35 +14,58 @@ const (
 )
 
 var (
-	ErrUserExists   = errors.New("user exists")
-	ErrUserNotFound = errors.New("not found")
-	ErrInvalidToken = errors.New("invalid token")
-	ErrUnauthorized = errors.New("unauthorized")
-	ErrTokenExpired = errors.New("token expired")
+	ErrUserExists       = errors.New("user exists")
+	ErrUserNotFound     = errors.New("not found")
+	ErrNameRequired     = errors.New("name is required")
+	ErrEmailRequired    = errors.New("email is required")
+	ErrPasswordRequired = errors.New("password is required")
+	ErrInvalidToken     = errors.New("invalid token")
+	ErrUnauthorized     = errors.New("unauthorized")
+	ErrTokenExpired     = errors.New("token expired")
+	ErrTokenNotFound    = errors.New("token not found")
 )
 
 type (
-	Registration struct {
+	RegistrationRequest struct {
+		Name     string
+		Email    string
+		Phone    string
+		Password string
+	}
+
+	RegistrationResponse struct {
 		UserID int64
 		Name   string
 		Email  string
 		Phone  string
 		Token  string
 	}
-
-	Registrator interface {
-		Register(name, username, pass, phone string) (*Registration, error)
-		ConfirmRegistration(tok string) (*User, error)
-		RenewRegistration(uid int64) (tok string, err error)
-	}
 )
 
-func (r *UserRepo) Register(name, email, pass, phone string) (*Registration, error) {
+func (r *UserRepo) Register(req *RegistrationRequest) (*RegistrationResponse, error) {
+	var (
+		name  = req.Name
+		email = req.Email
+		phone = req.Phone
+		pass  = req.Password
+	)
 
 	// sanitize values
 	name = strings.Trim(name, " ")
 	email = strings.ToLower(strings.Trim(email, " "))
 	phone = strings.Trim(phone, " ")
+
+	if name == "" {
+		return nil, ErrNameRequired
+	}
+
+	if email == "" {
+		return nil, ErrEmailRequired
+	}
+
+	if pass == "" {
+		return nil, ErrPasswordRequired
+	}
 
 	row := r.db.QueryRow("select email from users where email = $1", email)
 
@@ -87,7 +110,7 @@ func (r *UserRepo) Register(name, email, pass, phone string) (*Registration, err
 		return nil, err
 	}
 
-	res := Registration{
+	res := RegistrationResponse{
 		UserID: uid,
 		Name:   name,
 		Email:  email,
@@ -113,7 +136,7 @@ func (r *UserRepo) ConfirmRegistration(tok string) (*User, error) {
 	)
 
 	if err = row.Scan(&uid, &expires); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			err = ErrInvalidToken
 		}
 		return nil, err
@@ -147,7 +170,7 @@ func (r *UserRepo) ConfirmRegistration(tok string) (*User, error) {
 
 func (r *UserRepo) RenewRegistration(uid int64) (tok string, err error) {
 	if err = orm.Exec(r.db, "select 1 from users where id = $1", uid); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			err = ErrUserNotFound
 		}
 		return

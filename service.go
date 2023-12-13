@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"fmt"
+
 	"github.com/cristosal/orm"
 )
 
@@ -39,5 +41,9 @@ func (s *Service) Groups() *GroupRepo {
 }
 
 func (s *Service) Init() error {
+	if err := orm.CreateMigrationTable(s.db); err != nil {
+		return fmt.Errorf("error creating migration table: %w", err)
+	}
+
 	return orm.AddMigrations(s.db, migrations)
 }

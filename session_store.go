@@ -256,6 +256,7 @@ func (s RedisSessionStore) Save(sess *Session) error {
 func (RedisSessionStore) userSessionKey(uid string) string {
 	return fmt.Sprintf("%s:%s", userKey, uid)
 }
+
 func (RedisSessionStore) sessionKey(id string) string {
 	return fmt.Sprintf("%s:%s", sessionKey, id)
 }
