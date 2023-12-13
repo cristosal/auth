@@ -22,8 +22,8 @@ type (
 	// PgxSessionStore is a redis backed session store
 	RedisSessionStore struct{ redis *redis.Client }
 
-	// SessionStore is a postgres backed session store
-	SessionStore struct{ db orm.DB }
+	// SessionRepo is a postgres backed session store
+	SessionRepo struct{ db orm.DB }
 
 	pgxSessionRow struct {
 		ID        string
@@ -39,18 +39,18 @@ func (pgxSessionRow) TableName() string {
 	return "sessions"
 }
 
-// NewSessionStore returns postgres backed session store
-func NewSessionStore(db orm.DB) *SessionStore {
-	return &SessionStore{db}
+// NewSessionRepo returns postgres backed session store
+func NewSessionRepo(db orm.DB) *SessionRepo {
+	return &SessionRepo{db}
 }
 
 // Drop drops the session table
-func (s *SessionStore) Drop() error {
+func (s *SessionRepo) Drop() error {
 	return orm.Exec(s.db, "drop table sessions")
 }
 
 // Save upserts session into database
-func (s *SessionStore) Save(sess *Session) error {
+func (s *SessionRepo) Save(sess *Session) error {
 	sess.Counter++
 
 	if sess.ID == "" {
@@ -68,7 +68,7 @@ func (s *SessionStore) Save(sess *Session) error {
 }
 
 // ByID returns a session by its id
-func (s *SessionStore) ByID(sessionID string) (*Session, error) {
+func (s *SessionRepo) ByID(sessionID string) (*Session, error) {
 	var row pgxSessionRow
 	if err := orm.Get(s.db, &row, "where id = $1", sessionID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -82,7 +82,7 @@ func (s *SessionStore) ByID(sessionID string) (*Session, error) {
 }
 
 // ByUserID returns all sessions belonging to a user
-func (s *SessionStore) ByUserID(uid int64) ([]Session, error) {
+func (s *SessionRepo) ByUserID(uid int64) ([]Session, error) {
 	var rows []pgxSessionRow
 	if err := orm.List(s.db, &rows, "user_id = $1", uid); err != nil {
 		return nil, err
@@ -97,12 +97,12 @@ func (s *SessionStore) ByUserID(uid int64) ([]Session, error) {
 }
 
 // Delete session by id
-func (s *SessionStore) Delete(sess *Session) error {
+func (s *SessionRepo) Delete(sess *Session) error {
 	return orm.Exec(s.db, "delete from sessions where id = $1", sess.ID)
 }
 
 // DeleteByUserID deletes all sessions for users in the email list
-func (s *SessionStore) DeleteByEmails(emails []string) error {
+func (s *SessionRepo) DeleteByEmails(emails []string) error {
 	valueList := schema.ValueList(len(emails), 1)
 	sql := fmt.Sprintf(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email IN (%s))`, valueList)
 	var values []any
@@ -114,12 +114,12 @@ func (s *SessionStore) DeleteByEmails(emails []string) error {
 }
 
 // DeleteByUserID deletes all sessions for a given user
-func (s *SessionStore) DeleteByUserID(uid int64) error {
+func (s *SessionRepo) DeleteByUserID(uid int64) error {
 	return orm.Exec(s.db, "delete from sessions where user_id = $1", uid)
 }
 
 // DeleteExpiredSessions deletes all sessions which have expired
-func (s *SessionStore) DeleteExpiredSessions() error {
+func (s *SessionRepo) DeleteExpiredSessions() error {
 	return orm.Exec(s.db, "delete from sessions where expires_at < now()")
 }
 

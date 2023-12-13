@@ -5,37 +5,37 @@ import (
 )
 
 type Service struct {
-	db         orm.DB
-	permission *PermissionRepo
-	user       *UserRepo
-	group      *GroupRepo
-	sessions   *SessionStore
+	db             orm.DB
+	permissionRepo *PermissionRepo
+	userRepo       *UserRepo
+	groupRepo      *GroupRepo
+	sessionRepo    *SessionRepo
 }
 
 func NewService(db orm.DB) *Service {
 	return &Service{
-		db:         db,
-		permission: NewPermissionRepo(db),
-		group:      NewGroupRepo(db),
-		user:       NewUserRepo(db),
-		sessions:   NewSessionStore(db),
+		db:             db,
+		permissionRepo: NewPermissionRepo(db),
+		groupRepo:      NewGroupRepo(db),
+		userRepo:       NewUserRepo(db),
+		sessionRepo:    NewSessionRepo(db),
 	}
 }
 
-func (s *Service) Sessions() *SessionStore {
-	return s.sessions
+func (s *Service) Sessions() *SessionRepo {
+	return s.sessionRepo
 }
 
 func (s *Service) Users() *UserRepo {
-	return s.user
+	return s.userRepo
 }
 
 func (s *Service) Permissions() *PermissionRepo {
-	return s.permission
+	return s.permissionRepo
 }
 
 func (s *Service) Groups() *GroupRepo {
-	return s.group
+	return s.groupRepo
 }
 
 func (s *Service) Init() error {

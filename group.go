@@ -85,15 +85,6 @@ func (r *GroupRepo) RemoveUser(uid int64, gid int64) error {
 	return orm.Exec(r.db, "delete from group_users where user_id = $1 and group_id = $2", uid, gid)
 }
 
-// ListByName finds a group by it's name
-func (r *GroupRepo) ListByName(name string) ([]Group, error) {
-	var g []Group
-	if err := orm.List(r.db, &g, "where name = $1", name); err != nil {
-		return nil, err
-	}
-	return g, nil
-}
-
 // GroupByName finds a group by it's name
 func (r *GroupRepo) ByName(name string) (*Group, error) {
 	var g Group
