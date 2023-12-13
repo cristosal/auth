@@ -20,10 +20,6 @@ func TestPgxSessionStore(t *testing.T) {
 	pgxStore := auth.NewSessionStore(db)
 	pgxStore.Drop()
 
-	if err := pgxStore.Init(); err != nil {
-		t.Fatal(err)
-	}
-
 	var (
 		sess    = auth.NewSession(time.Now().Add(time.Minute))
 		msgType = "success"

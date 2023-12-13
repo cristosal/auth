@@ -3,7 +3,7 @@ package auth
 import "github.com/cristosal/orm"
 
 // Paginate paginates through users returning the most recent ones first
-func (r *UserService) Paginate(page int, q string) ([]User, *orm.PaginationResults, error) {
+func (r *UserRepo) Paginate(page int, q string) ([]User, *orm.PaginationResults, error) {
 	var users []User
 	results, err := orm.Paginate(r.db, &users, &orm.PaginationOptions{
 		Query:         q,
@@ -22,7 +22,7 @@ func (r *UserService) Paginate(page int, q string) ([]User, *orm.PaginationResul
 }
 
 // ByID returns a user by id field
-func (r *UserService) ByID(id int64) (*User, error) {
+func (r *UserRepo) ByID(id int64) (*User, error) {
 	var u User
 	if err := orm.Get(r.db, &u, "where id = $1", id); err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func (r *UserService) ByID(id int64) (*User, error) {
 }
 
 // ByEmail returns a user by email
-func (r *UserService) ByEmail(email string) (*User, error) {
+func (r *UserRepo) ByEmail(email string) (*User, error) {
 	var u User
 	if err := orm.Get(r.db, &u, "where email = $1", email); err != nil {
 		return nil, err
@@ -42,6 +42,6 @@ func (r *UserService) ByEmail(email string) (*User, error) {
 }
 
 // UpdateInfo updates the users info, excluding the password
-func (r *UserService) UpdateInfo(u *User) error {
+func (r *UserRepo) UpdateInfo(u *User) error {
 	return orm.Exec(r.db, "update users set name = $1, email = $2, phone = $3 where id = $4", u.Name, u.Email, u.Phone, u.ID)
 }

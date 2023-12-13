@@ -39,8 +39,8 @@ func (u *User) VerifyPassword(pass string) bool {
 	return err == nil
 }
 
-type UserService struct{ db orm.DB }
+type UserRepo struct{ db orm.DB }
 
-func NewUserService(db orm.DB) *UserService {
-	return &UserService{db}
+func NewUserRepo(db orm.DB) *UserRepo {
+	return &UserRepo{db}
 }

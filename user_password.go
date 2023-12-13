@@ -16,7 +16,7 @@ type PasswordReseter interface {
 	ConfirmPasswordReset(token, pass string) error
 }
 
-func (r *UserService) RequestPasswordReset(email string) (tok string, err error) {
+func (r *UserRepo) RequestPasswordReset(email string) (tok string, err error) {
 	var (
 		id   int64
 		name string
@@ -60,7 +60,7 @@ func (r *UserService) RequestPasswordReset(email string) (tok string, err error)
 	return
 }
 
-func (r *UserService) ConfirmPasswordReset(token, pass string) error {
+func (r *UserRepo) ConfirmPasswordReset(token, pass string) error {
 
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -102,7 +102,7 @@ func (r *UserService) ConfirmPasswordReset(token, pass string) error {
 	return tx.Commit()
 }
 
-func (r *UserService) ResetPassword(uid int64, pass string) error {
+func (r *UserRepo) ResetPassword(uid int64, pass string) error {
 
 	hashed, err := PasswordHash(pass)
 	if err != nil {

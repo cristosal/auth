@@ -44,19 +44,6 @@ func NewSessionStore(db orm.DB) *SessionStore {
 	return &SessionStore{db}
 }
 
-// Init creates session table
-func (s *SessionStore) Init() error {
-	return orm.Exec(s.db, `create table if not exists sessions (
-		id varchar(64) primary key not null,
-		user_id int,
-		data jsonb not null,
-		created_at timestamptz not null default now(),
-		updated_at timestamptz not null default now(),
-		expires_at timestamptz not null,
-		foreign key (user_id) references users(id)
-	)`)
-}
-
 // Drop drops the session table
 func (s *SessionStore) Drop() error {
 	return orm.Exec(s.db, "drop table sessions")

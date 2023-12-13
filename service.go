@@ -7,7 +7,7 @@ import (
 type Service struct {
 	db         orm.DB
 	permission *PermissionRepo
-	user       *UserService
+	user       *UserRepo
 	group      *GroupRepo
 	sessions   *SessionStore
 }
@@ -17,7 +17,7 @@ func NewService(db orm.DB) *Service {
 		db:         db,
 		permission: NewPermissionRepo(db),
 		group:      NewGroupRepo(db),
-		user:       NewUserService(db),
+		user:       NewUserRepo(db),
 		sessions:   NewSessionStore(db),
 	}
 }
@@ -26,7 +26,7 @@ func (s *Service) Sessions() *SessionStore {
 	return s.sessions
 }
 
-func (s *Service) Users() *UserService {
+func (s *Service) Users() *UserRepo {
 	return s.user
 }
 
