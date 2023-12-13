@@ -40,13 +40,13 @@ func (p Permissions) Has(name string) bool {
 	return false
 }
 
-type PermissionPgxRepo struct{ db orm.DB }
+type PermissionRepo struct{ db orm.DB }
 
-func NewPermissionPgxRepo(db orm.DB) *PermissionPgxRepo {
-	return &PermissionPgxRepo{db}
+func NewPermissionRepo(db orm.DB) *PermissionRepo {
+	return &PermissionRepo{db}
 }
 
-func (r *PermissionPgxRepo) Seed(permissions []Permission) error {
+func (r *PermissionRepo) Seed(permissions []Permission) error {
 	var (
 		i     = 1
 		parts []string
@@ -78,7 +78,7 @@ func (r *PermissionPgxRepo) Seed(permissions []Permission) error {
 }
 
 // List lists all permissions
-func (s *PermissionPgxRepo) List() (Permissions, error) {
+func (s *PermissionRepo) List() (Permissions, error) {
 	var perms []Permission
 	err := orm.List(s.db, &perms, "order by name asc")
 	if err != nil {
@@ -87,18 +87,18 @@ func (s *PermissionPgxRepo) List() (Permissions, error) {
 	return perms, nil
 }
 
-func (s *PermissionPgxRepo) Add(p *Permission) error {
+func (s *PermissionRepo) Add(p *Permission) error {
 	return orm.Add(s.db, p)
 }
 
-func (s *PermissionPgxRepo) Update(p *Permission) error {
+func (s *PermissionRepo) Update(p *Permission) error {
 	return orm.UpdateByID(s.db, p)
 }
 
-func (s *PermissionPgxRepo) Clear() error {
+func (s *PermissionRepo) Clear() error {
 	return orm.Exec(s.db, "delete from permissions")
 }
 
-func (s *PermissionPgxRepo) Remove(id int64) error {
+func (s *PermissionRepo) Remove(id int64) error {
 	return orm.Exec(s.db, "delete from permissions where id = $1", id)
 }

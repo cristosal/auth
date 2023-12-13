@@ -37,7 +37,7 @@ type (
 	}
 )
 
-func (r *UserPgxService) Register(name, email, pass, phone string) (*Registration, error) {
+func (r *UserService) Register(name, email, pass, phone string) (*Registration, error) {
 
 	// sanitize values
 	name = strings.Trim(name, " ")
@@ -98,7 +98,7 @@ func (r *UserPgxService) Register(name, email, pass, phone string) (*Registratio
 	return &res, nil
 }
 
-func (r *UserPgxService) ConfirmRegistration(tok string) (*User, error) {
+func (r *UserService) ConfirmRegistration(tok string) (*User, error) {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return nil, err
@@ -145,7 +145,7 @@ func (r *UserPgxService) ConfirmRegistration(tok string) (*User, error) {
 	return &u, nil
 }
 
-func (r *UserPgxService) RenewRegistration(uid int64) (tok string, err error) {
+func (r *UserService) RenewRegistration(uid int64) (tok string, err error) {
 	if err = orm.Exec(r.db, "select 1 from users where id = $1", uid); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			err = ErrUserNotFound

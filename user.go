@@ -39,14 +39,8 @@ func (u *User) VerifyPassword(pass string) bool {
 	return err == nil
 }
 
-type UserPgxService struct{ db orm.DB }
+type UserService struct{ db orm.DB }
 
-func NewUserPgxService(db orm.DB) *UserPgxService {
-	return &UserPgxService{db}
-}
-
-type UserService interface {
-	UserRepo
-	Authenticator
-	PasswordReseter
+func NewUserService(db orm.DB) *UserService {
+	return &UserService{db}
 }

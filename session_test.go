@@ -17,7 +17,7 @@ func TestPgxSessionStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pgxStore := auth.NewPgxSessionStore(db)
+	pgxStore := auth.NewSessionStore(db)
 	pgxStore.Drop()
 
 	if err := pgxStore.Init(); err != nil {

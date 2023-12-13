@@ -22,7 +22,7 @@ func TestRegister(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := auth.NewPgxService(conn)
+	s := auth.NewService(conn)
 
 	// test sanitizes value
 	reg, err := s.Users().Register("pepe   ", " pepito@gmail.com  ", "hello world", "123")

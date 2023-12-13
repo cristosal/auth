@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cristosal/orm"
+	"github.com/cristosal/orm/schema"
 	"github.com/go-redis/redis/v7"
 	"github.com/jackc/pgx/v5"
 )
@@ -17,20 +18,12 @@ var (
 )
 
 type (
-	// SessionStore is the interface implemented by all stores that handle sessions
-	SessionStore interface {
-		ByID(sid string) (*Session, error)
-		ByUserID(uid int64) ([]Session, error)
-		Save(s *Session) error
-		Delete(s *Session) error
-		DeleteByUserID(uid int64) error
-	}
 
 	// PgxSessionStore is a redis backed session store
 	RedisSessionStore struct{ redis *redis.Client }
 
-	// PgxSessionStore is a postgres backed session store
-	PgxSessionStore struct{ db orm.DB }
+	// SessionStore is a postgres backed session store
+	SessionStore struct{ db orm.DB }
 
 	pgxSessionRow struct {
 		ID        string
@@ -46,13 +39,13 @@ func (pgxSessionRow) TableName() string {
 	return "sessions"
 }
 
-// NewPgxSessionStore returns postgres backed session store
-func NewPgxSessionStore(db orm.DB) *PgxSessionStore {
-	return &PgxSessionStore{db}
+// NewSessionStore returns postgres backed session store
+func NewSessionStore(db orm.DB) *SessionStore {
+	return &SessionStore{db}
 }
 
 // Init creates session table
-func (s *PgxSessionStore) Init() error {
+func (s *SessionStore) Init() error {
 	return orm.Exec(s.db, `create table if not exists sessions (
 		id varchar(64) primary key not null,
 		user_id int,
@@ -65,12 +58,12 @@ func (s *PgxSessionStore) Init() error {
 }
 
 // Drop drops the session table
-func (s *PgxSessionStore) Drop() error {
+func (s *SessionStore) Drop() error {
 	return orm.Exec(s.db, "drop table sessions")
 }
 
 // Save upserts session into database
-func (s *PgxSessionStore) Save(sess *Session) error {
+func (s *SessionStore) Save(sess *Session) error {
 	sess.Counter++
 
 	if sess.ID == "" {
@@ -88,7 +81,7 @@ func (s *PgxSessionStore) Save(sess *Session) error {
 }
 
 // ByID returns a session by its id
-func (s *PgxSessionStore) ByID(sessionID string) (*Session, error) {
+func (s *SessionStore) ByID(sessionID string) (*Session, error) {
 	var row pgxSessionRow
 	if err := orm.Get(s.db, &row, "where id = $1", sessionID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -102,7 +95,7 @@ func (s *PgxSessionStore) ByID(sessionID string) (*Session, error) {
 }
 
 // ByUserID returns all sessions belonging to a user
-func (s *PgxSessionStore) ByUserID(uid int64) ([]Session, error) {
+func (s *SessionStore) ByUserID(uid int64) ([]Session, error) {
 	var rows []pgxSessionRow
 	if err := orm.List(s.db, &rows, "user_id = $1", uid); err != nil {
 		return nil, err
@@ -117,17 +110,29 @@ func (s *PgxSessionStore) ByUserID(uid int64) ([]Session, error) {
 }
 
 // Delete session by id
-func (s *PgxSessionStore) Delete(sess *Session) error {
+func (s *SessionStore) Delete(sess *Session) error {
 	return orm.Exec(s.db, "delete from sessions where id = $1", sess.ID)
 }
 
+// DeleteByUserID deletes all sessions for users in the email list
+func (s *SessionStore) DeleteByEmails(emails []string) error {
+	valueList := schema.ValueList(len(emails), 1)
+	sql := fmt.Sprintf(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email IN (%s))`, valueList)
+	var values []any
+	for i := range emails {
+		values = append(values, emails[i])
+	}
+
+	return orm.Exec(s.db, sql, values...)
+}
+
 // DeleteByUserID deletes all sessions for a given user
-func (s *PgxSessionStore) DeleteByUserID(uid int64) error {
+func (s *SessionStore) DeleteByUserID(uid int64) error {
 	return orm.Exec(s.db, "delete from sessions where user_id = $1", uid)
 }
 
 // DeleteExpiredSessions deletes all sessions which have expired
-func (s *PgxSessionStore) DeleteExpiredSessions() error {
+func (s *SessionStore) DeleteExpiredSessions() error {
 	return orm.Exec(s.db, "delete from sessions where expires_at < now()")
 }
 

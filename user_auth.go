@@ -11,7 +11,7 @@ type Authenticator interface {
 	Authenticate(email, pass string) (*User, error)
 }
 
-func (s *UserPgxService) Authenticate(email, pass string) (*User, error) {
+func (s *UserService) Authenticate(email, pass string) (*User, error) {
 	u, err := s.ByEmail(email)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrUnauthorized

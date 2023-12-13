@@ -4,40 +4,40 @@ import (
 	"github.com/cristosal/orm"
 )
 
-type PgxService struct {
+type Service struct {
 	db         orm.DB
-	permission *PermissionPgxRepo
-	user       *UserPgxService
-	group      *GroupPgxRepo
-	sessions   *PgxSessionStore
+	permission *PermissionRepo
+	user       *UserService
+	group      *GroupRepo
+	sessions   *SessionStore
 }
 
-func NewPgxService(db orm.DB) *PgxService {
-	return &PgxService{
+func NewService(db orm.DB) *Service {
+	return &Service{
 		db:         db,
-		permission: NewPermissionPgxRepo(db),
-		group:      NewGroupPgxRepo(db),
-		user:       NewUserPgxService(db),
-		sessions:   NewPgxSessionStore(db),
+		permission: NewPermissionRepo(db),
+		group:      NewGroupRepo(db),
+		user:       NewUserService(db),
+		sessions:   NewSessionStore(db),
 	}
 }
 
-func (s *PgxService) Sessions() *PgxSessionStore {
+func (s *Service) Sessions() *SessionStore {
 	return s.sessions
 }
 
-func (s *PgxService) Users() *UserPgxService {
+func (s *Service) Users() *UserService {
 	return s.user
 }
 
-func (s *PgxService) Permissions() *PermissionPgxRepo {
+func (s *Service) Permissions() *PermissionRepo {
 	return s.permission
 }
 
-func (s *PgxService) Groups() *GroupPgxRepo {
+func (s *Service) Groups() *GroupRepo {
 	return s.group
 }
 
-func (s *PgxService) Init() error {
+func (s *Service) Init() error {
 	return orm.AddMigrations(s.db, migrations)
 }

@@ -9,13 +9,13 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-func NewTestService(t *testing.T) *auth.PgxService {
+func NewTestService(t *testing.T) *auth.Service {
 	conn, err := sql.Open("pgx", os.Getenv("CONNECTION_STRING"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return auth.NewPgxService(conn)
+	return auth.NewService(conn)
 }
 
 func TestPermission(t *testing.T) {

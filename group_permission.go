@@ -48,7 +48,7 @@ func (gps GroupPermissions) Has(name string) bool {
 	return false
 }
 
-func (r *GroupPgxRepo) UserPermissions(uid int64) (GroupPermissions, error) {
+func (r *GroupRepo) UserPermissions(uid int64) (GroupPermissions, error) {
 	sql := `select 
 		gp.group_id, 
 		gp.permission_id, 
@@ -101,7 +101,7 @@ func (r *GroupPgxRepo) UserPermissions(uid int64) (GroupPermissions, error) {
 }
 
 // Permissions returns group permissions for a group by group id
-func (r *GroupPgxRepo) Permissions(gid int64) (GroupPermissions, error) {
+func (r *GroupRepo) Permissions(gid int64) (GroupPermissions, error) {
 	sql := `select 
 		gp.group_id, 
 		gp.permission_id, 
@@ -149,10 +149,10 @@ func (r *GroupPgxRepo) Permissions(gid int64) (GroupPermissions, error) {
 	return groupPermissions, nil
 }
 
-func (r *GroupPgxRepo) AddPermission(gid, pid int64, value int) error {
+func (r *GroupRepo) AddPermission(gid, pid int64, value int) error {
 	return orm.Exec(r.db, "insert into group_permissions (group_id, permission_id, value) values ($1, $2, $3) on conflict do nothing", gid, pid, value)
 }
 
-func (r *GroupPgxRepo) RemovePermission(gid, pid int64) error {
+func (r *GroupRepo) RemovePermission(gid, pid int64) error {
 	return orm.Exec(r.db, "delete from group_permissions where group_id = $1 and permission_id = $2", gid, pid)
 }
