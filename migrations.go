@@ -39,6 +39,7 @@ var migrations = []orm.Migration{
 		Up: `create table if not exists pass_tokens (
 				user_id int not null references users (id) on delete cascade,
 				token varchar(64) not null,
+				email varchar(255) not null,
 				expires timestamptz,
 				primary key (user_id)
 			);`,

@@ -59,7 +59,9 @@ func (r *PermissionRepo) Seed(permissions []Permission) error {
 		i += 3
 	}
 
-	sql := fmt.Sprintf("insert into permissions (name, description, type) values %s on conflict (name) do nothing", strings.Join(parts, ", "))
+	sql := fmt.Sprintf("insert into permissions (name, description, type) values %s on conflict (name) do nothing",
+		strings.Join(parts, ", "))
+
 	if err := orm.Exec(r.db, sql, args...); err != nil {
 		return err
 	}

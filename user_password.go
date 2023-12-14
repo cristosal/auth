@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/cristosal/orm"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -16,7 +17,18 @@ type PasswordReseter interface {
 	ConfirmPasswordReset(token, pass string) error
 }
 
-func (r *UserRepo) RequestPasswordReset(email string) (tok string, err error) {
+type PasswordResetToken struct {
+	UserID  int64
+	Email   string
+	Token   string
+	Expires time.Time
+}
+
+func (PasswordResetToken) TableName() string {
+	return "pass_tokens"
+}
+
+func (r *UserRepo) RequestPasswordReset(email string) (t *PasswordResetToken, err error) {
 	var (
 		id   int64
 		name string
@@ -26,10 +38,10 @@ func (r *UserRepo) RequestPasswordReset(email string) (tok string, err error) {
 	row := r.db.QueryRow("select id, name from users where email = $1", email)
 	if err = row.Scan(&id, &name); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return "", ErrUserNotFound
+			return nil, ErrUserNotFound
 		}
 
-		return "", err
+		return nil, err
 	}
 
 	tx, err := r.db.Begin()
@@ -39,25 +51,30 @@ func (r *UserRepo) RequestPasswordReset(email string) (tok string, err error) {
 
 	defer tx.Rollback()
 
-	// delete existing password tokens
-	_, err = tx.Exec("delete from pass_tokens where user_id = $1", id)
+	// delete existing password tokens for the given user
+	if err := orm.Remove(tx, t, "where user_id = $1", id); err != nil {
+		return nil, err
+	}
+
+	token, err := GenerateToken(16)
 	if err != nil {
 		return
 	}
 
-	tok, err = GenerateToken(16)
-	if err != nil {
-		return
+	t.UserID = id
+	t.Token = token
+	t.Email = email
+	t.Expires = time.Now().Add(time.Hour * 3)
+
+	if err := orm.Add(tx, t); err != nil {
+		return nil, err
 	}
 
-	// insert token with expiry value
-	_, err = tx.Exec("insert into pass_tokens (user_id, token, expires) values ($1, $2, $3)", id, tok, time.Now().Add(time.Hour*3))
-	if err != nil {
-		return
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 
-	err = tx.Commit()
-	return
+	return t, nil
 }
 
 func (r *UserRepo) ConfirmPasswordReset(token, pass string) error {

@@ -11,6 +11,7 @@ import (
 )
 
 func TestRegister(t *testing.T) {
+	// the problem here is we should use sqlmock
 	conn, err := sql.Open("pgx", os.Getenv("CONNECTION_STRING"))
 	if err != nil {
 		t.Fatal(err)
@@ -23,14 +24,19 @@ func TestRegister(t *testing.T) {
 	}
 
 	s := auth.NewService(conn)
+	req := &auth.RegistrationRequest{
+		Name:     "pepe       ",
+		Email:    " pepito@gmail.com   ",
+		Phone:    "hello world",
+		Password: "  123 ",
+	}
 
-	// test sanitizes value
-	reg, err := s.Users().Register("pepe   ", " pepito@gmail.com  ", "hello world", "123")
+	reg, err := s.Users().Register(req)
 	if err != nil {
 		t.Fatalf("unable to register %v", err)
 	}
 
-	_, err = s.Users().Register("pepe   ", "    pepito@gmail.com  ", "hello world", "123")
+	_, err = s.Users().Register(req)
 	if !errors.Is(err, auth.ErrUserExists) {
 		t.Fatalf("expected user exists got %v", err)
 	}

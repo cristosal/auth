@@ -1,19 +1,17 @@
 package auth
 
 import (
+	"database/sql"
 	"errors"
-
-	"github.com/cristosal/orm"
-	"github.com/jackc/pgx/v5"
 )
 
 type Authenticator interface {
 	Authenticate(email, pass string) (*User, error)
 }
 
-func (s *UserRepo) Authenticate(email, pass string) (*User, error) {
-	u, err := s.ByEmail(email)
-	if errors.Is(err, pgx.ErrNoRows) {
+func (r *UserRepo) Authenticate(email, pass string) (*User, error) {
+	u, err := r.ByEmail(email)
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrUnauthorized
 	}
 
@@ -25,7 +23,8 @@ func (s *UserRepo) Authenticate(email, pass string) (*User, error) {
 		return nil, ErrUnauthorized
 	}
 
-	if err := orm.Exec(s.db, "update users set last_login = now() where id = $1", u.ID); err != nil {
+	row := r.db.QueryRow("update users set last_login = now() where id = $1 returning last_login", u.ID)
+	if err := row.Scan(&u.LastLogin); err != nil {
 		return nil, err
 	}
 
