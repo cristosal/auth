@@ -24,13 +24,12 @@ https://pkg.go.dev/github.com/cristosal/auth
 
 ## Usage
 
-Create a new service using an existing pgx connection
+Create a new service using an existing `*sql.DB`
 
 ```go
+db, _ := sql.Open("pgx", os.Getenv("CONNECTION_STRING"))
 
-db, _ := pgx.Connect(context.Background(), os.Getenv("CONNECTION_STRING"))
-
-authService := auth.NewPgxService(db)
+authService := auth.NewService(db)
 ```
 
 
