@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -33,16 +35,16 @@ func (g *Group) NewPermission(p *Permission, v int) *GroupPermission {
 	}
 }
 
-// GroupPgxRepo us a group repository using pgx
-type GroupPgxRepo struct{ db orm.DB }
+// GroupRepo us a group repository using pgx
+type GroupRepo struct{ db orm.DB }
 
-func NewGroupPgxRepo(db orm.DB) *GroupPgxRepo {
-	return &GroupPgxRepo{db}
+func NewGroupRepo(db orm.DB) *GroupRepo {
+	return &GroupRepo{db}
 }
 
 // Seed seeds groups to the database.
 // If they already exist it will not return an error
-func (r *GroupPgxRepo) Seed(groups []Group) error {
+func (r *GroupRepo) Seed(groups []Group) error {
 	var (
 		i     = 1
 		parts []string
@@ -76,40 +78,51 @@ func (r *GroupPgxRepo) Seed(groups []Group) error {
 
 // AddUser adds a user to a group.
 // No error will occur if a user is already part of the group
-func (r *GroupPgxRepo) AddUser(uid int64, gid int64) error {
+func (r *GroupRepo) AddUser(uid int64, gid int64) error {
 	return orm.Exec(r.db, "insert into group_users (user_id, group_id) values ($1, $2) on conflict do nothing", uid, gid)
 }
 
 // RemoveUser removes a user from a group
-func (r *GroupPgxRepo) RemoveUser(uid int64, gid int64) error {
+func (r *GroupRepo) RemoveUser(uid int64, gid int64) error {
 	return orm.Exec(r.db, "delete from group_users where user_id = $1 and group_id = $2", uid, gid)
 }
 
 // GroupByName finds a group by it's name
-func (r *GroupPgxRepo) ByName(name string) (*Group, error) {
+func (r *GroupRepo) ByName(name string) (*Group, error) {
 	var g Group
 	if err := orm.Get(r.db, &g, "where name = $1", name); err != nil {
+		if errors.Is(err, orm.ErrNotFound) {
+			return nil, ErrGroupNotFound
+		}
+
 		return nil, err
 	}
 	return &g, nil
 }
 
 // Remove deletes a group by id
-func (r *GroupPgxRepo) Remove(gid int64) error {
-	return orm.Exec(r.db, "delete from groups where id = $1", gid)
+func (r *GroupRepo) Remove(gid int64) error {
+	err := orm.Exec(r.db, "delete from groups where id = $1", gid)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrGroupNotFound
+	}
+
+	return err
 }
 
 // GroupsByUser returns all groups that user is a part of
-func (r *GroupPgxRepo) ByUser(uid int64) (Groups, error) {
+func (r *GroupRepo) ByUser(uid int64) (Groups, error) {
 	var groups []Group
 	if err := orm.List(r.db, &groups, "inner join group_users gu on gu.user_id = $1", uid); err != nil {
 		return nil, err
 	}
+
 	return groups, nil
 }
 
 // Groups returns all groups ordered by priority (highest first)
-func (r *GroupPgxRepo) List() (Groups, error) {
+func (r *GroupRepo) List() (Groups, error) {
 	var groups []Group
 	err := orm.List(r.db, &groups, "order by priority desc")
 	if err != nil {
@@ -119,26 +132,38 @@ func (r *GroupPgxRepo) List() (Groups, error) {
 }
 
 // GroupByID returns a group by it's id
-func (r *GroupPgxRepo) ByID(id int64) (*Group, error) {
+func (r *GroupRepo) ByID(id int64) (*Group, error) {
 	var g Group
 	if err := orm.Get(r.db, &g, "where id = $1", id); err != nil {
+		if errors.Is(err, orm.ErrNotFound) {
+			return nil, ErrGroupNotFound
+		}
+
 		return nil, err
 	}
 	return &g, nil
 }
 
 // Add adds a group
-func (r *GroupPgxRepo) Add(g *Group) error {
+func (r *GroupRepo) Add(g *Group) error {
+	if g.Name == "" {
+		return ErrNameRequired
+	}
+
 	return orm.Add(r.db, g)
 }
 
 // Update updates a group with name and priority
-func (r *GroupPgxRepo) Update(g *Group) error {
+func (r *GroupRepo) Update(g *Group) error {
+	if g.Name == "" {
+		return ErrNameRequired
+	}
+
 	return orm.UpdateByID(r.db, g)
 }
 
 // GroupUserCount counts all users within a group
-func (r *GroupPgxRepo) UserCount(gid int64) (int, error) {
+func (r *GroupRepo) UserCount(gid int64) (int, error) {
 	row := r.db.QueryRow("select count(*) from group_users where group_id = $1", gid)
 	var count int
 	if err := row.Scan(&count); err != nil {
@@ -148,7 +173,7 @@ func (r *GroupPgxRepo) UserCount(gid int64) (int, error) {
 }
 
 // GroupUsers returns all users within a group
-func (r *GroupPgxRepo) Users(gid int64) ([]User, error) {
+func (r *GroupRepo) Users(gid int64) ([]User, error) {
 	cols := schema.MustGet(&User{}).Fields.Columns().PrefixedList("u")
 	sql := fmt.Sprintf("select %s from users u inner join group_users gu on u.id = gu.user_id where gu.group_id = $1 order by u.created_at desc", cols)
 	rows, err := r.db.Query(sql, gid)

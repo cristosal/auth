@@ -1,48 +1,68 @@
 package auth
 
 import (
+	"database/sql"
 	"errors"
 	"strings"
 	"time"
 
 	"github.com/cristosal/orm"
-	"github.com/jackc/pgx/v5"
 )
 
-const (
-	TokenDuration = time.Hour
-)
-
-var (
-	ErrUserExists   = errors.New("user exists")
-	ErrUserNotFound = errors.New("not found")
-	ErrInvalidToken = errors.New("invalid token")
-	ErrUnauthorized = errors.New("unauthorized")
-	ErrTokenExpired = errors.New("token expired")
-)
+const TokenDuration = time.Hour
 
 type (
-	Registration struct {
+	RegistrationRequest struct {
+		Name     string
+		Email    string
+		Phone    string
+		Password string
+	}
+
+	RegistrationToken struct {
+		UserID  int64
+		Email   string
+		Token   string
+		Expires time.Time
+	}
+
+	RegistrationResponse struct {
 		UserID int64
 		Name   string
 		Email  string
 		Phone  string
 		Token  string
 	}
-
-	Registrator interface {
-		Register(name, username, pass, phone string) (*Registration, error)
-		ConfirmRegistration(tok string) (*User, error)
-		RenewRegistration(uid int64) (tok string, err error)
-	}
 )
 
-func (r *UserPgxService) Register(name, email, pass, phone string) (*Registration, error) {
+func (RegistrationToken) TableName() string {
+	return "registration_tokens"
+}
+
+func (r *UserRepo) Register(req *RegistrationRequest) (*RegistrationResponse, error) {
+	var (
+		name  = req.Name
+		email = req.Email
+		phone = req.Phone
+		pass  = req.Password
+	)
 
 	// sanitize values
 	name = strings.Trim(name, " ")
-	email = strings.ToLower(strings.Trim(email, " "))
+	email = r.SanitizeEmail(email)
 	phone = strings.Trim(phone, " ")
+
+	if name == "" {
+		return nil, ErrNameRequired
+	}
+
+	if email == "" {
+		return nil, ErrEmailRequired
+	}
+
+	if pass == "" {
+		return nil, ErrPasswordRequired
+	}
 
 	row := r.db.QueryRow("select email from users where email = $1", email)
 
@@ -54,7 +74,7 @@ func (r *UserPgxService) Register(name, email, pass, phone string) (*Registratio
 		return nil, ErrUserExists
 	}
 
-	newpass, err := PasswordHash(pass)
+	newpass, err := r.PasswordHash(pass)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +107,7 @@ func (r *UserPgxService) Register(name, email, pass, phone string) (*Registratio
 		return nil, err
 	}
 
-	res := Registration{
+	res := RegistrationResponse{
 		UserID: uid,
 		Name:   name,
 		Email:  email,
@@ -98,7 +118,8 @@ func (r *UserPgxService) Register(name, email, pass, phone string) (*Registratio
 	return &res, nil
 }
 
-func (r *UserPgxService) ConfirmRegistration(tok string) (*User, error) {
+// ConfirmRegistration confirms a users account if a registration token is found matching tok
+func (r *UserRepo) ConfirmRegistration(tok string) (*User, error) {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return nil, err
@@ -113,13 +134,15 @@ func (r *UserPgxService) ConfirmRegistration(tok string) (*User, error) {
 	)
 
 	if err = row.Scan(&uid, &expires); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			err = ErrInvalidToken
+		if errors.Is(err, sql.ErrNoRows) {
+			err = ErrTokenNotFound
 		}
+
 		return nil, err
 	}
 
 	if expires.Before(time.Now()) {
+		// delete token
 		return nil, ErrTokenExpired
 	}
 
@@ -145,38 +168,30 @@ func (r *UserPgxService) ConfirmRegistration(tok string) (*User, error) {
 	return &u, nil
 }
 
-func (r *UserPgxService) RenewRegistration(uid int64) (tok string, err error) {
-	if err = orm.Exec(r.db, "select 1 from users where id = $1", uid); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			err = ErrUserNotFound
+// RenewRegistration generates another registration token for the given user.
+// Returns ErrTokenNotFound if a registration token was not available.
+// To issue a renewal, a token must have already been generated
+func (r *UserRepo) RenewRegistration(uid int64) (*RegistrationToken, error) {
+	var t RegistrationToken
+	if err := orm.Get(r.db, &t, "where user_id = $1", uid); err != nil {
+		if errors.Is(err, orm.ErrNotFound) {
+			return nil, ErrTokenNotFound
 		}
-		return
+
+		return nil, err
 	}
 
-	tx, err := r.db.Begin()
+	tok, err := GenerateToken(16)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	defer tx.Rollback()
+	t.Token = tok
+	t.Expires = time.Now().Add(time.Hour * 3)
 
-	if _, err = tx.Exec("delete from registration_tokens where user_id = $1", uid); err != nil {
-		return
+	if err := orm.Update(r.db, &t, "where user_id = $1", uid); err != nil {
+		return nil, err
 	}
 
-	tok, err = GenerateToken(16)
-	if err != nil {
-		return "", err
-	}
-
-	_, err = tx.Exec("insert into registration_tokens (user_id, token, expires) values ($1, $2, $3)", uid, tok, time.Now().Add(TokenDuration))
-	if err != nil {
-		return "", err
-	}
-
-	if err = tx.Commit(); err != nil {
-		return "", err
-	}
-
-	return tok, nil
+	return &t, nil
 }

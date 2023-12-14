@@ -39,6 +39,7 @@ var migrations = []orm.Migration{
 		Up: `create table if not exists pass_tokens (
 				user_id int not null references users (id) on delete cascade,
 				token varchar(64) not null,
+				email varchar(255) not null,
 				expires timestamptz,
 				primary key (user_id)
 			);`,
@@ -49,6 +50,7 @@ var migrations = []orm.Migration{
 		Description: "create registration tokens table",
 		Up: `create table if not exists registration_tokens (
 				user_id int not null references users (id) on delete cascade,
+				email varchar(255) not null,
 				token varchar(64) not null,
 				expires timestamptz not null,
 				primary key (user_id)
@@ -88,6 +90,7 @@ var migrations = []orm.Migration{
 				primary key (group_id, permission_id),
 				foreign key (group_id) references groups (id) on delete cascade,
 				foreign key (permission_id) references permissions (id) on delete cascade
+				email varchar(255) not null,
 			);`,
 		Down: "DROP TABLE group_permissions",
 	},

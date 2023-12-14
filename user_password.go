@@ -1,22 +1,35 @@
 package auth
 
 import (
+	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/cristosal/orm"
+	"github.com/cristosal/orm/schema"
 	"golang.org/x/crypto/bcrypt"
 )
 
 const PasswordHashCost = 10
 
-type PasswordReseter interface {
-	ResetPassword(uid int64, pass string) error
-	RequestPasswordReset(email string) (token string, err error)
-	ConfirmPasswordReset(token, pass string) error
+type PasswordResetToken struct {
+	UserID  int64
+	Email   string
+	Token   string
+	Expires time.Time
 }
 
-func (r *UserPgxService) RequestPasswordReset(email string) (tok string, err error) {
+type PasswordReset struct {
+	Token    string
+	Password string
+}
+
+func (PasswordResetToken) TableName() string {
+	return "pass_tokens"
+}
+
+func (r *UserRepo) RequestPasswordReset(email string) (*PasswordResetToken, error) {
 	var (
 		id   int64
 		name string
@@ -24,87 +37,104 @@ func (r *UserPgxService) RequestPasswordReset(email string) (tok string, err err
 
 	// check if user exists.
 	row := r.db.QueryRow("select id, name from users where email = $1", email)
-	if err = row.Scan(&id, &name); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", ErrUserNotFound
+	if err := row.Scan(&id, &name); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrUserNotFound
 		}
 
-		return "", err
+		return nil, err
 	}
 
 	tx, err := r.db.Begin()
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	defer tx.Rollback()
 
-	// delete existing password tokens
-	_, err = tx.Exec("delete from pass_tokens where user_id = $1", id)
-	if err != nil {
-		return
+	var t PasswordResetToken
+	// delete existing password tokens for the given user
+	if err := orm.Remove(tx, &t, "where user_id = $1", id); err != nil {
+		return nil, err
 	}
 
-	tok, err = GenerateToken(16)
+	token, err := GenerateToken(16)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	// insert token with expiry value
-	_, err = tx.Exec("insert into pass_tokens (user_id, token, expires) values ($1, $2, $3)", id, tok, time.Now().Add(time.Hour*3))
-	if err != nil {
-		return
+	t.UserID = id
+	t.Token = token
+	t.Email = email
+	t.Expires = time.Now().Add(time.Hour * 3)
+
+	if err := orm.Add(tx, &t); err != nil {
+		return nil, err
 	}
 
-	err = tx.Commit()
-	return
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &t, nil
 }
 
-func (r *UserPgxService) ConfirmPasswordReset(token, pass string) error {
-
+// ConfirmPasswordReset
+func (r *UserRepo) ConfirmPasswordReset(reset *PasswordReset) (*User, error) {
 	tx, err := r.db.Begin()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	defer tx.Rollback()
 
-	// get user assosciated with token
-	row := tx.QueryRow("select user_id from pass_tokens where token = $1", token)
+	var (
+		expires time.Time
+		uid     int64
+	)
 
-	var uid int64
-	if err = row.Scan(&uid); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrInvalidToken
+	// get user assosciated with token
+	row := tx.QueryRow("select user_id, expires from pass_tokens where token = $1", reset.Token)
+	if err = row.Scan(&uid, &expires); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTokenNotFound
 		}
 
-		return err
+		return nil, err
+	}
+
+	if expires.Before(time.Now()) {
+		return nil, ErrTokenExpired
 	}
 
 	// hash the new password
-	newpass, err := PasswordHash(pass)
+	password, err := r.PasswordHash(reset.Password)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// update password
-	_, err = tx.Exec("update users set password = $1 where id = $2", newpass, uid)
+	var u User
+	cols := schema.MustGet(&u).Fields.Columns().List()
+	err = orm.QueryRow(tx, &u, fmt.Sprintf("update users set password = $1 where id = $2 returning %s", cols), password, uid)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// remove token
-	_, err = tx.Exec("delete from pass_tokens where user_id = $1 and token = $2", uid, token)
+	_, err = tx.Exec("delete from pass_tokens where user_id = $1 and token = $2", uid, reset.Token)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &u, nil
 }
 
-func (r *UserPgxService) ResetPassword(uid int64, pass string) error {
-
-	hashed, err := PasswordHash(pass)
+func (r *UserRepo) ResetPassword(uid int64, pass string) error {
+	hashed, err := r.PasswordHash(pass)
 	if err != nil {
 		return err
 	}
@@ -113,7 +143,8 @@ func (r *UserPgxService) ResetPassword(uid int64, pass string) error {
 	return err
 }
 
-func PasswordHash(pass string) (string, error) {
+// PasswordHash performs a bcrypt hash for the password based on PasswordHashCost
+func (UserRepo) PasswordHash(pass string) (string, error) {
 	str, err := bcrypt.GenerateFromPassword([]byte(pass), PasswordHashCost)
 	if err != nil {
 		return "", err

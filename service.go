@@ -1,43 +1,49 @@
 package auth
 
 import (
+	"fmt"
+
 	"github.com/cristosal/orm"
 )
 
-type PgxService struct {
-	db         orm.DB
-	permission *PermissionPgxRepo
-	user       *UserPgxService
-	group      *GroupPgxRepo
-	sessions   *PgxSessionStore
+type Service struct {
+	db             orm.DB
+	permissionRepo *PermissionRepo
+	userRepo       *UserRepo
+	groupRepo      *GroupRepo
+	sessionRepo    *SessionRepo
 }
 
-func NewPgxService(db orm.DB) *PgxService {
-	return &PgxService{
-		db:         db,
-		permission: NewPermissionPgxRepo(db),
-		group:      NewGroupPgxRepo(db),
-		user:       NewUserPgxService(db),
-		sessions:   NewPgxSessionStore(db),
+func NewService(db orm.DB) *Service {
+	return &Service{
+		db:             db,
+		permissionRepo: NewPermissionRepo(db),
+		groupRepo:      NewGroupRepo(db),
+		userRepo:       NewUserRepo(db),
+		sessionRepo:    NewSessionRepo(db),
 	}
 }
 
-func (s *PgxService) Sessions() *PgxSessionStore {
-	return s.sessions
+func (s *Service) Sessions() *SessionRepo {
+	return s.sessionRepo
 }
 
-func (s *PgxService) Users() *UserPgxService {
-	return s.user
+func (s *Service) Users() *UserRepo {
+	return s.userRepo
 }
 
-func (s *PgxService) Permissions() *PermissionPgxRepo {
-	return s.permission
+func (s *Service) Permissions() *PermissionRepo {
+	return s.permissionRepo
 }
 
-func (s *PgxService) Groups() *GroupPgxRepo {
-	return s.group
+func (s *Service) Groups() *GroupRepo {
+	return s.groupRepo
 }
 
-func (s *PgxService) Init() error {
+func (s *Service) Init() error {
+	if err := orm.CreateMigrationTable(s.db); err != nil {
+		return fmt.Errorf("error creating migration table: %w", err)
+	}
+
 	return orm.AddMigrations(s.db, migrations)
 }
