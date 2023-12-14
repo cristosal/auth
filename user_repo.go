@@ -13,7 +13,6 @@ func (r *UserRepo) Paginate(page int, q string) ([]User, *orm.PaginationResults,
 		SortBy:        "created_at",
 		SortDirection: "DESC",
 	})
-
 	if err != nil {
 		return nil, nil, err
 	}
