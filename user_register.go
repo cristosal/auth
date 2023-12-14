@@ -185,14 +185,16 @@ func (r *UserRepo) ConfirmRegistration(tok string) (*User, error) {
 // RenewRegistration generates another registration token for the given user.
 // Returns ErrTokenNotFound if a registration token was not available.
 // To issue a renewal, a token must have already been generated
-func (r *UserRepo) RenewRegistration(uid int64) (t *RegistrationToken, err error) {
-	if err := orm.Get(r.db, t, "where user_id = $1", uid); err != nil {
+func (r *UserRepo) RenewRegistration(uid int64) (*RegistrationToken, error) {
+	var t RegistrationToken
+	if err := orm.Get(r.db, &t, "where user_id = $1", uid); err != nil {
 		if errors.Is(err, orm.ErrNotFound) {
 			return nil, ErrTokenNotFound
 		}
 
 		return nil, err
 	}
+
 	tok, err := GenerateToken(16)
 	if err != nil {
 		return nil, err
@@ -201,9 +203,9 @@ func (r *UserRepo) RenewRegistration(uid int64) (t *RegistrationToken, err error
 	t.Token = tok
 	t.Expires = time.Now().Add(time.Hour * 3)
 
-	if err := orm.Update(r.db, t, "where user_id = $1", uid); err != nil {
+	if err := orm.Update(r.db, &t, "where user_id = $1", uid); err != nil {
 		return nil, err
 	}
 
-	return t, nil
+	return &t, nil
 }
