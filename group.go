@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -32,6 +34,8 @@ func (g *Group) NewPermission(p *Permission, v int) *GroupPermission {
 		Value:        v,
 	}
 }
+
+var ErrGroupNotFound = errors.New("group not found")
 
 // GroupRepo us a group repository using pgx
 type GroupRepo struct{ db orm.DB }
@@ -96,7 +100,13 @@ func (r *GroupRepo) ByName(name string) (*Group, error) {
 
 // Remove deletes a group by id
 func (r *GroupRepo) Remove(gid int64) error {
-	return orm.Exec(r.db, "delete from groups where id = $1", gid)
+	err := orm.Exec(r.db, "delete from groups where id = $1", gid)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrGroupNotFound
+	}
+
+	return err
 }
 
 // GroupsByUser returns all groups that user is a part of
@@ -129,11 +139,19 @@ func (r *GroupRepo) ByID(id int64) (*Group, error) {
 
 // Add adds a group
 func (r *GroupRepo) Add(g *Group) error {
+	if g.Name == "" {
+		return ErrNameRequired
+	}
+
 	return orm.Add(r.db, g)
 }
 
 // Update updates a group with name and priority
 func (r *GroupRepo) Update(g *Group) error {
+	if g.Name == "" {
+		return ErrNameRequired
+	}
+
 	return orm.UpdateByID(r.db, g)
 }
 
