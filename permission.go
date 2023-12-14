@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -99,6 +100,34 @@ func (s *PermissionRepo) Update(p *Permission) error {
 
 func (s *PermissionRepo) Clear() error {
 	return orm.Exec(s.db, "delete from permissions")
+}
+
+func (s *PermissionRepo) ByID(id int64) (*Permission, error) {
+	var p Permission
+	p.ID = id
+
+	if err := orm.GetByID(s.db, &p); err != nil {
+		if errors.Is(err, orm.ErrNotFound) {
+			return nil, ErrPermissionNotFound
+		}
+
+		return nil, err
+	}
+
+	return &p, nil
+}
+
+func (s *PermissionRepo) ByName(name string) (*Permission, error) {
+	var p Permission
+	if err := orm.Get(s.db, &p, "where name = $1", name); err != nil {
+		if errors.Is(err, orm.ErrNotFound) {
+			return nil, ErrPermissionNotFound
+
+		}
+		return nil, err
+	}
+
+	return &p, nil
 }
 
 func (s *PermissionRepo) Remove(id int64) error {

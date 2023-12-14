@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/cristosal/orm"
@@ -28,20 +29,24 @@ func (r *UserRepo) Paginate(page int, q string) ([]User, *orm.PaginationResults,
 func (r *UserRepo) ByID(id int64) (*User, error) {
 	var u User
 	if err := orm.Get(r.db, &u, "where id = $1", id); err != nil {
+		if errors.Is(err, orm.ErrNotFound) {
+			return nil, ErrUserNotFound
+		}
+
 		return nil, err
 	}
 
 	return &u, nil
 }
 
-func (UserRepo) sanitizeEmail(email string) string {
-	return strings.ToLower(strings.Trim(email, " "))
-}
-
 // ByEmail returns a user by email
 func (r *UserRepo) ByEmail(email string) (*User, error) {
 	var u User
-	if err := orm.Get(r.db, &u, "where email = $1", r.sanitizeEmail(email)); err != nil {
+	if err := orm.Get(r.db, &u, "where email = $1", r.SanitizeEmail(email)); err != nil {
+		if errors.Is(err, orm.ErrNotFound) {
+			return nil, ErrUserNotFound
+		}
+
 		return nil, err
 	}
 
@@ -51,4 +56,8 @@ func (r *UserRepo) ByEmail(email string) (*User, error) {
 // UpdateInfo updates the users info, excluding the password
 func (r *UserRepo) UpdateInfo(u *User) error {
 	return orm.Exec(r.db, "update users set name = $1, email = $2, phone = $3 where id = $4", u.Name, u.Email, u.Phone, u.ID)
+}
+
+func (UserRepo) SanitizeEmail(email string) string {
+	return strings.ToLower(strings.Trim(email, " "))
 }

@@ -108,7 +108,7 @@ func (r *UserRepo) ConfirmPasswordReset(reset *PasswordReset) (*User, error) {
 	}
 
 	// hash the new password
-	password, err := PasswordHash(reset.Password)
+	password, err := r.PasswordHash(reset.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func (r *UserRepo) ConfirmPasswordReset(reset *PasswordReset) (*User, error) {
 }
 
 func (r *UserRepo) ResetPassword(uid int64, pass string) error {
-	hashed, err := PasswordHash(pass)
+	hashed, err := r.PasswordHash(pass)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func (r *UserRepo) ResetPassword(uid int64, pass string) error {
 }
 
 // PasswordHash performs a bcrypt hash for the password based on PasswordHashCost
-func PasswordHash(pass string) (string, error) {
+func (UserRepo) PasswordHash(pass string) (string, error) {
 	str, err := bcrypt.GenerateFromPassword([]byte(pass), PasswordHashCost)
 	if err != nil {
 		return "", err

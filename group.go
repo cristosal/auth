@@ -35,8 +35,6 @@ func (g *Group) NewPermission(p *Permission, v int) *GroupPermission {
 	}
 }
 
-var ErrGroupNotFound = errors.New("group not found")
-
 // GroupRepo us a group repository using pgx
 type GroupRepo struct{ db orm.DB }
 
@@ -93,6 +91,10 @@ func (r *GroupRepo) RemoveUser(uid int64, gid int64) error {
 func (r *GroupRepo) ByName(name string) (*Group, error) {
 	var g Group
 	if err := orm.Get(r.db, &g, "where name = $1", name); err != nil {
+		if errors.Is(err, orm.ErrNotFound) {
+			return nil, ErrGroupNotFound
+		}
+
 		return nil, err
 	}
 	return &g, nil
@@ -115,6 +117,7 @@ func (r *GroupRepo) ByUser(uid int64) (Groups, error) {
 	if err := orm.List(r.db, &groups, "inner join group_users gu on gu.user_id = $1", uid); err != nil {
 		return nil, err
 	}
+
 	return groups, nil
 }
 
@@ -132,6 +135,10 @@ func (r *GroupRepo) List() (Groups, error) {
 func (r *GroupRepo) ByID(id int64) (*Group, error) {
 	var g Group
 	if err := orm.Get(r.db, &g, "where id = $1", id); err != nil {
+		if errors.Is(err, orm.ErrNotFound) {
+			return nil, ErrGroupNotFound
+		}
+
 		return nil, err
 	}
 	return &g, nil

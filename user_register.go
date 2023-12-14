@@ -9,21 +9,7 @@ import (
 	"github.com/cristosal/orm"
 )
 
-const (
-	TokenDuration = time.Hour
-)
-
-var (
-	ErrUserExists       = errors.New("user exists")
-	ErrUserNotFound     = errors.New("not found")
-	ErrNameRequired     = errors.New("name is required")
-	ErrEmailRequired    = errors.New("email is required")
-	ErrPasswordRequired = errors.New("password is required")
-	ErrInvalidToken     = errors.New("invalid token")
-	ErrUnauthorized     = errors.New("unauthorized")
-	ErrTokenExpired     = errors.New("token expired")
-	ErrTokenNotFound    = errors.New("token not found")
-)
+const TokenDuration = time.Hour
 
 type (
 	RegistrationRequest struct {
@@ -63,7 +49,7 @@ func (r *UserRepo) Register(req *RegistrationRequest) (*RegistrationResponse, er
 
 	// sanitize values
 	name = strings.Trim(name, " ")
-	email = r.sanitizeEmail(email)
+	email = r.SanitizeEmail(email)
 	phone = strings.Trim(phone, " ")
 
 	if name == "" {
@@ -88,7 +74,7 @@ func (r *UserRepo) Register(req *RegistrationRequest) (*RegistrationResponse, er
 		return nil, ErrUserExists
 	}
 
-	newpass, err := PasswordHash(pass)
+	newpass, err := r.PasswordHash(pass)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +135,7 @@ func (r *UserRepo) ConfirmRegistration(tok string) (*User, error) {
 
 	if err = row.Scan(&uid, &expires); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			err = ErrInvalidToken
+			err = ErrTokenNotFound
 		}
 
 		return nil, err
