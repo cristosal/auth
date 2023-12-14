@@ -1,6 +1,10 @@
 package auth
 
-import "github.com/cristosal/orm"
+import (
+	"strings"
+
+	"github.com/cristosal/orm"
+)
 
 // Paginate paginates through users returning the most recent ones first
 func (r *UserRepo) Paginate(page int, q string) ([]User, *orm.PaginationResults, error) {
@@ -30,10 +34,14 @@ func (r *UserRepo) ByID(id int64) (*User, error) {
 	return &u, nil
 }
 
+func (UserRepo) sanitizeEmail(email string) string {
+	return strings.ToLower(strings.Trim(email, " "))
+}
+
 // ByEmail returns a user by email
 func (r *UserRepo) ByEmail(email string) (*User, error) {
 	var u User
-	if err := orm.Get(r.db, &u, "where email = $1", email); err != nil {
+	if err := orm.Get(r.db, &u, "where email = $1", r.sanitizeEmail(email)); err != nil {
 		return nil, err
 	}
 

@@ -5,12 +5,9 @@ import (
 	"errors"
 )
 
-type Authenticator interface {
-	Authenticate(email, pass string) (*User, error)
-}
-
 func (r *UserRepo) Authenticate(email, pass string) (*User, error) {
 	u, err := r.ByEmail(email)
+
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrUnauthorized
 	}

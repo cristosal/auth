@@ -63,7 +63,7 @@ func (r *UserRepo) Register(req *RegistrationRequest) (*RegistrationResponse, er
 
 	// sanitize values
 	name = strings.Trim(name, " ")
-	email = strings.ToLower(strings.Trim(email, " "))
+	email = r.sanitizeEmail(email)
 	phone = strings.Trim(phone, " ")
 
 	if name == "" {

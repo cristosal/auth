@@ -11,14 +11,14 @@ const (
 )
 
 type User struct {
-	ID          int64      `json:"id"`
-	Name        string     `json:"name"`
-	Email       string     `json:"email"`
-	Phone       string     `json:"phone"`
-	Password    string     `json:"-"`
-	ConfirmedAt *time.Time `json:"confirmed_at"`
-	LastLogin   *time.Time `json:"last_login"`
-	CreatedAt   *time.Time `json:"created_at"`
+	ID          int64
+	Name        string
+	Email       string
+	Phone       string
+	Password    string `json:"-"`
+	ConfirmedAt *time.Time
+	LastLogin   *time.Time
+	CreatedAt   *time.Time
 }
 
 func (u *User) TableName() string {
