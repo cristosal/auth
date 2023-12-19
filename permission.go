@@ -9,7 +9,7 @@ import (
 	"github.com/cristosal/orm"
 )
 
-type PermissionType string
+type PermissionType = string
 
 const (
 	Quantity PermissionType = "quantity"

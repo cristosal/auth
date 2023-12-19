@@ -2,10 +2,8 @@ module github.com/cristosal/auth
 
 go 1.21.4
 
-replace github.com/cristosal/orm => ../orm
-
 require (
-	github.com/cristosal/orm v0.0.2-beta
+	github.com/cristosal/orm v0.0.4-beta
 	github.com/go-redis/redis/v7 v7.4.1
 	github.com/jackc/pgx/v5 v5.5.0
 	golang.org/x/crypto v0.15.0

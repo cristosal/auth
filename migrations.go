@@ -90,7 +90,6 @@ var migrations = []orm.Migration{
 				primary key (group_id, permission_id),
 				foreign key (group_id) references groups (id) on delete cascade,
 				foreign key (permission_id) references permissions (id) on delete cascade
-				email varchar(255) not null,
 			);`,
 		Down: "DROP TABLE group_permissions",
 	},
