@@ -98,7 +98,7 @@ func (r *UserRepo) Register(req *RegistrationRequest) (*RegistrationResponse, er
 		return nil, err
 	}
 
-	_, err = tx.Exec("insert into registration_tokens (user_id, token, expires) values ($1, $2, $3)", uid, tok, time.Now().Add(TokenDuration))
+	_, err = tx.Exec("insert into registration_tokens (user_id, email, token, expires) values ($1, $2, $3, $4)", uid, email, tok, time.Now().Add(TokenDuration))
 	if err != nil {
 		return nil, err
 	}

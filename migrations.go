@@ -96,7 +96,7 @@ var migrations = []orm.Migration{
 	{
 		Name:        "group users table",
 		Description: "create group users table",
-		Up: `create table if not exists group_permissions (
+		Up: `create table if not exists group_users (
 				user_id int not null,
 				group_id int not null,
 				primary key(user_id, group_id),
