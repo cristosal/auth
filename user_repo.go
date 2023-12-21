@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/cristosal/orm"
@@ -37,6 +38,18 @@ func (r *UserRepo) ByID(id int64) (*User, error) {
 	}
 
 	return &u, nil
+}
+
+// ByGroup returns a slice of users belonging to a group
+func (r *UserRepo) ByGroup(gid int64) ([]User, error) {
+	var u User
+	cols := orm.Columns(u).PrefixedList("u")
+	sql := fmt.Sprintf("select %s from %s u inner join group_users gu on gu.user_id = u.id where gu.group_id = $1", cols, u.TableName())
+	var users []User
+	if err := orm.Query(r.db, &users, sql, gid); err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 // ByEmail returns a user by email
